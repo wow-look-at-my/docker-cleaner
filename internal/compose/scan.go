@@ -2,6 +2,7 @@ package compose
 
 import (
 	"fmt"
+	"github.com/wow-look-at-my/go-containers/set"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -10,12 +11,10 @@ import (
 )
 
 // composeNames are the filenames docker compose itself looks for.
-var composeNames = map[string]bool{
-	"compose.yaml":        true,
-	"compose.yml":         true,
-	"docker-compose.yaml": true,
-	"docker-compose.yml":  true,
-}
+var composeNames = set.Of[string]("compose.yaml",
+	"compose.yml",
+	"docker-compose.yaml",
+	"docker-compose.yml")
 
 // ScanResult is what a walk found and what it could not reach.
 type ScanResult struct {
@@ -122,7 +121,7 @@ func walk(root string) (files, failures []string, dirs int) {
 					continue
 				}
 				stack = append(stack, full)
-			case composeNames[name]:
+			case composeNames.Contains(name):
 				files = append(files, full)
 			}
 		}

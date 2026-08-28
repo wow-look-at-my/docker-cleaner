@@ -6,6 +6,7 @@ import (
 
 	"github.com/wow-look-at-my/docker-cleaner/internal/compose"
 	"github.com/wow-look-at-my/docker-cleaner/internal/dockercli"
+	"github.com/wow-look-at-my/go-containers/set"
 )
 
 // builder carries the state one Compute call threads through its phases.
@@ -25,10 +26,10 @@ type builder struct {
 // to. Discovery needs this up front so it knows which projects it must resolve
 // before anything can be called garbage.
 func ComposeProjects(s dockercli.Snapshot) []string {
-	seen := map[string]bool{}
+	seen := set.New[string]()
 	add := func(labels map[string]string) {
 		if p := labels[compose.LabelProject]; p != "" {
-			seen[p] = true
+			seen.Add(p)
 		}
 	}
 	for _, c := range s.Containers {
@@ -41,8 +42,8 @@ func ComposeProjects(s dockercli.Snapshot) []string {
 		add(n.Labels)
 	}
 
-	out := make([]string, 0, len(seen))
-	for p := range seen {
+	out := make([]string, 0, seen.Len())
+	for p := range seen.All() {
 		out = append(out, p)
 	}
 	sort.Strings(out)

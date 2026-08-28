@@ -103,9 +103,9 @@ func (r *refs) status(ids []string) state {
 	return state{by: freed}
 }
 
-func (r *refs) image(id string) state     { return r.status(r.images[id]) }
-func (r *refs) volume(name string) state  { return r.status(r.volumes[name]) }
-func (r *refs) network(id string) state   { return r.status(r.networks[id]) }
+func (r *refs) image(id string) state        { return r.status(r.images[id]) }
+func (r *refs) volume(name string) state     { return r.status(r.volumes[name]) }
+func (r *refs) network(id string) state      { return r.status(r.networks[id]) }
 func (r *refs) imageByName(ref string) state { return r.status(r.byName[ref]) }
 
 func containerName(c dockercli.Container) string {

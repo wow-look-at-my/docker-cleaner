@@ -1,6 +1,7 @@
 package compose
 
 import (
+	"github.com/wow-look-at-my/go-containers/set"
 	"os"
 	"sort"
 	"strings"
@@ -23,14 +24,12 @@ type Mount struct {
 // pseudoFS are kernel interfaces. Nothing under them is a user's compose
 // project, and walking them wastes time or blocks. tmpfs is deliberately
 // absent: /tmp holds real projects.
-var pseudoFS = map[string]bool{
-	"proc": true, "sysfs": true, "devtmpfs": true, "devpts": true,
-	"securityfs": true, "debugfs": true, "tracefs": true, "bpf": true,
-	"pstore": true, "configfs": true, "fusectl": true, "nsfs": true,
-	"binfmt_misc": true, "autofs": true, "mqueue": true, "hugetlbfs": true,
-	"cgroup": true, "cgroup2": true, "rpc_pipefs": true, "efivarfs": true,
-	"selinuxfs": true, "ramfs": true, "fuse.portal": true,
-}
+var pseudoFS = set.Of[string]("proc", "sysfs", "devtmpfs", "devpts",
+	"securityfs", "debugfs", "tracefs", "bpf",
+	"pstore", "configfs", "fusectl", "nsfs",
+	"binfmt_misc", "autofs", "mqueue", "hugetlbfs",
+	"cgroup", "cgroup2", "rpc_pipefs", "efivarfs",
+	"selinuxfs", "ramfs", "fuse.portal")
 
 // ReadMounts parses mountinfo and decides what to walk. Docker's own storage
 // root is skipped: it holds container layers, not projects.
@@ -58,7 +57,7 @@ func parseMounts(text, dockerRoot string) []Mount {
 	for i := range mounts {
 		m := &mounts[i]
 		switch {
-		case pseudoFS[m.FSType] || strings.HasPrefix(m.FSType, "cgroup"):
+		case pseudoFS.Contains(m.FSType) || strings.HasPrefix(m.FSType, "cgroup"):
 			m.Skip = "kernel filesystem (" + m.FSType + ")"
 		case dockerRoot != "" && underPath(m.Point, dockerRoot):
 			m.Skip = "docker storage root"

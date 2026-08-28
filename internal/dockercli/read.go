@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/wow-look-at-my/go-containers/set"
 	"strings"
 )
 
@@ -63,11 +64,11 @@ func readImages(ctx context.Context, r Runner) ([]Image, error) {
 	if err != nil {
 		return nil, err
 	}
-	seen := map[string]bool{}
+	seen := set.New[string]()
 	var ids []string
 	for _, x := range rows {
-		if x.ID != "" && !seen[x.ID] {
-			seen[x.ID] = true
+		if x.ID != "" && !seen.Contains(x.ID) {
+			seen.Add(x.ID)
 			ids = append(ids, x.ID)
 		}
 	}

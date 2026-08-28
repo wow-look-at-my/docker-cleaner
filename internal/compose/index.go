@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/wow-look-at-my/go-containers/set"
 	"os"
 	"path/filepath"
 	"sort"
@@ -77,15 +78,15 @@ func (i *Index) Record(project string, files []string, when time.Time) {
 		return
 	}
 	e := i.Projects[project]
-	have := map[string]bool{}
+	have := set.New[string]()
 	for _, f := range e.Files {
-		have[f] = true
+		have.Add(f)
 	}
 	for _, f := range files {
-		if f == "" || have[f] {
+		if f == "" || have.Contains(f) {
 			continue
 		}
-		have[f] = true
+		have.Add(f)
 		e.Files = append(e.Files, f)
 	}
 	sort.Strings(e.Files)

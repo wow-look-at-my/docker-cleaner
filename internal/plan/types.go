@@ -107,11 +107,11 @@ type CachePlan struct {
 
 // Plan is the whole decision.
 type Plan struct {
-	Now          time.Time
-	Age          time.Duration
+	Now           time.Time
+	Age           time.Duration
 	BuildCacheAge time.Duration
-	Cutoff       time.Time
-	CacheCutoff  time.Time
+	Cutoff        time.Time
+	CacheCutoff   time.Time
 
 	Containers []Target
 	Images     []Target
