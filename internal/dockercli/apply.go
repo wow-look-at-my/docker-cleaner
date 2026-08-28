@@ -5,26 +5,22 @@ import (
 	"strings"
 )
 
-// RemoveContainer removes one container. Never -f, which would kill a running
-// container the plan never selected, and never -v, which would take anonymous
-// volumes that are not in the plan and break dry-run/apply symmetry.
+// RemoveContainer removes one container. No -f (it would kill a running
+// container) and no -v (it would take volumes the plan never listed).
 func RemoveContainer(id string) []string { return []string{"rm", id} }
 
-// RemoveImageRef removes one reference. Removing by repo:tag is the precise
-// operation: an id carrying several tags cannot be removed by id at all.
+// RemoveImageRef removes one reference; an id with several tags needs each.
 func RemoveImageRef(ref string) []string { return []string{"rmi", ref} }
 
-// RemoveVolume removes one volume, one call each so a single failure does not
-// hide the others.
+// RemoveVolume removes one volume, one call each so failures stay visible.
 func RemoveVolume(name string) []string { return []string{"volume", "rm", name} }
 
 // RemoveNetwork removes one network.
 func RemoveNetwork(id string) []string { return []string{"network", "rm", id} }
 
-// PruneBuildCache builds the prune for one builder. until= here means "not
-// used in", which is the only ageing docker measures that says anything about
-// whether a thing is still wanted. The duration must be a Go duration: 7d is
-// not one, 168h is.
+// PruneBuildCache prunes one builder. Here until= means "not used in", the
+// only ageing docker offers that tracks whether a thing is still wanted. It
+// takes a Go duration: 168h, never 7d.
 func PruneBuildCache(builder, until string) []string {
 	args := []string{"buildx", "prune"}
 	if builder != "" {
@@ -33,8 +29,7 @@ func PruneBuildCache(builder, until string) []string {
 	return append(args, "--force", "--filter", "until="+until)
 }
 
-// Do runs one mutating command and returns the first line of stderr on
-// failure, which is the part worth showing.
+// Do runs one mutating command, reporting docker's first stderr line.
 func Do(ctx context.Context, r Runner, args []string) error {
 	_, errb, err := r.Run(ctx, args...)
 	if err == nil {

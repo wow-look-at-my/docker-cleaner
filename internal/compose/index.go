@@ -18,8 +18,8 @@ import (
 // DefaultIndexPath is where the project index lives.
 const DefaultIndexPath = "/var/lib/docker-cleaner/projects.json"
 
-// indexSchema is bumped when the on-disk shape changes. A file from a future
-// version is discarded rather than half-read.
+// indexSchema is bumped when the on-disk shape changes. A newer file is
+// discarded, never half-read.
 const indexSchema = 1
 
 // Entry is one project's known compose files.
@@ -35,8 +35,8 @@ type Index struct {
 
 	path     string
 	readOnly bool
-	// Warning explains why the index could not be persisted, so a run that
-	// silently loses its speed advantage says so instead.
+	// Warning says why the index could not persist, so a run that lost its
+	// speed advantage says so rather than just being slow.
 	Warning string
 }
 
@@ -107,8 +107,7 @@ func (i *Index) Files(project string) []string {
 	return live
 }
 
-// Forget drops a project whose files have all disappeared, so a deleted stack
-// does not keep its entry forever.
+// Forget drops a project whose files have all disappeared.
 func (i *Index) Forget(project string) { delete(i.Projects, project) }
 
 // Save writes the index atomically. An unwritable directory is a warning, not

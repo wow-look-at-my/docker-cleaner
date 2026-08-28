@@ -86,9 +86,7 @@ func Compute(s dockercli.Snapshot, d *compose.Discovery, o Options, now time.Tim
 		sort.Strings(b.plan.Warnings)
 	}
 
-	// Containers go first so the cascade can see what their removal frees.
-	// Everything after this consults b.removing rather than the raw container
-	// list.
+	// Containers go first so the cascade sees what their removal frees.
 	b.selectContainers()
 	b.refs = buildRefs(s.Containers, s.Networks, b.removing)
 
@@ -124,13 +122,10 @@ func (b *builder) claims() *compose.Claims {
 	return b.disco.Claims
 }
 
-// composeUnresolved decides what to do with a resource labelled for a project
-// no compose file explains.
-//
-// When the search was exhaustive, no file means the project was deleted and
-// the resource is collectible: deleting the compose file is how a project is
-// retired. When the search could not be exhaustive, the same absence means
-// nothing at all, so the resource is kept. Not looking is never evidence.
+// composeUnresolved handles a resource whose project no compose file explains.
+// After an exhaustive search that means the project was deleted, so the
+// resource collects. After an incomplete one it means nothing, so it is kept:
+// not looking is never evidence.
 func (b *builder) composeUnresolved(labels map[string]string) (Reason, string, bool) {
 	project := labels[compose.LabelProject]
 	if project == "" || b.disco == nil {
@@ -156,9 +151,8 @@ func (b *builder) composeImageProject(img dockercli.Image) (string, bool) {
 	return "", false
 }
 
-// composeUnresolvedImage keeps an image while any compose file failed to
-// render. An unreadable file may well name this image, and a missing variable
-// must never be the reason an image disappears.
+// composeUnresolvedImage keeps every image while any compose file failed to
+// render: an unreadable file may name this one.
 func (b *builder) composeUnresolvedImage(dockercli.Image) (Reason, string, bool) {
 	if b.disco == nil || b.disco.Complete {
 		return "", "", false

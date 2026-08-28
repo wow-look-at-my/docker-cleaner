@@ -9,8 +9,8 @@ import (
 	"github.com/wow-look-at-my/docker-cleaner/internal/dockercli"
 )
 
-// Label keys compose writes. Only the container labels name files on disk,
-// which is exactly why the index exists.
+// Label keys compose writes. Only container labels name files on disk, which
+// is why the index exists.
 const (
 	LabelProject     = "com.docker.compose.project"
 	LabelConfigFiles = "com.docker.compose.project.config_files"
@@ -19,13 +19,12 @@ const (
 // Discovery is the compose picture for one run.
 type Discovery struct {
 	Claims *Claims
-	// Complete is false when some part of the search could not run. While it
-	// is false an unresolved project is unknown, not deleted.
+	// Complete false means an unresolved project is unknown, not deleted.
 	Complete bool
 	Failures []string
 	Skipped  []Mount
-	// DirsWalked is zero on a run answered entirely from the index. The dry
-	// run prints it, because the speed claim should be checkable.
+	// DirsWalked is zero when the index answered everything; the report prints
+	// it so the speed claim stays checkable.
 	DirsWalked int
 	Warning    string
 }
@@ -88,8 +87,7 @@ func Discover(ctx context.Context, r dockercli.Runner, containers []dockercli.Co
 	for project, p := range d.Claims.Projects {
 		idx.Record(project, p.Files, o.Now)
 	}
-	// A project whose files all vanished has nothing left to point at. Drop it
-	// so the index reflects the disk rather than accumulating dead entries.
+	// Drop a project whose files all vanished, so the index tracks the disk.
 	for _, project := range wanted {
 		if !d.Claims.Known(project) && len(idx.Files(project)) == 0 {
 			idx.Forget(project)
@@ -103,12 +101,11 @@ func Discover(ctx context.Context, r dockercli.Runner, containers []dockercli.Co
 type Resolution int
 
 const (
-	// Alive means a compose file on disk still declares the project.
+	// Alive: a compose file on disk still declares the project.
 	Alive Resolution = iota
-	// Deleted means an exhaustive search found no such file.
+	// Deleted: an exhaustive search found no such file.
 	Deleted
-	// Unknown means the search could not be exhaustive, so nothing is deleted
-	// on the strength of it.
+	// Unknown: the search was not exhaustive, so nothing acts on it.
 	Unknown
 )
 

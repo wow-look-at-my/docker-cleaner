@@ -10,8 +10,7 @@ import (
 	"time"
 )
 
-// inspectChunk bounds each inspect call so a host with thousands of objects
-// does not blow ARG_MAX.
+// inspectChunk keeps a host with thousands of objects under ARG_MAX.
 const inspectChunk = 100
 
 // Runner executes one docker invocation. Tests substitute a fake.

@@ -37,9 +37,8 @@ func (b *builder) selectImages() {
 			keepReasons[img.ID] = Kept{KindImage, name, ReasonReferenced, strings.Join(st.holders, ", ")}
 			continue
 		}
-		// A container's Config.Image is the reference as written, which can
-		// now name a different id than the one the container actually runs.
-		// It is used only to widen protection, never to grant it.
+		// Config.Image is the reference as written, which may now name a
+		// different id. It only widens protection, never grants it.
 		if held := b.referencedByName(img); held != "" {
 			keepReasons[img.ID] = Kept{KindImage, name, ReasonReferencedName, held}
 			continue
@@ -242,9 +241,8 @@ func imageDetail(img dockercli.Image) string {
 	return "no build date"
 }
 
-// imageNote warns about a digest-pinned image. It has no tags, so it looks
-// like a rebuild leftover, but a compose file may pin that digest and will
-// re-pull it silently.
+// imageNote flags a digest-pinned image: untagged, so it looks like a rebuild
+// leftover, but something may pin that digest and re-pull it.
 func imageNote(img dockercli.Image) string {
 	if len(img.RepoTags) == 0 && len(img.RepoDigests) > 0 {
 		return "digest-pinned: " + img.RepoDigests[0]

@@ -83,13 +83,11 @@ func aliveState(status string) (Reason, bool) {
 	}
 }
 
-// containerAge picks the timestamp that means "offline since".
-//
-// A container that never ran has FinishedAt set to the zero time, which parses
-// to year one and is therefore older than every cutoff. Comparing it naively
-// deletes every such container, including one made a minute ago. So a created
-// container ages by its creation instead, and any other state without a usable
-// FinishedAt is kept and reported.
+// containerAge picks the timestamp meaning "offline since". A container that
+// never ran has FinishedAt at the zero time, which parses to year one and so
+// beats every cutoff; comparing it naively deletes containers made a minute
+// ago. A created container ages by creation, and any other state without a
+// usable FinishedAt is kept.
 func containerAge(c dockercli.Container) (time.Time, string, bool) {
 	if c.State.Status == "created" {
 		if t, ok := dockercli.ParseTime(c.Created); ok {

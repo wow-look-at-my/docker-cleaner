@@ -18,8 +18,7 @@ const (
 	KindBuildCache Kind = "build cache"
 )
 
-// Reason says why a resource was kept. Every non-target carries one, so
-// nothing is dropped from the report silently.
+// Reason says why a resource was kept. Every non-target carries one.
 type Reason string
 
 // Why a container was kept.
@@ -69,20 +68,15 @@ const ReasonStepDisabled Reason = "that step is turned off"
 
 // Target is one resource this run will remove.
 type Target struct {
-	Kind Kind
-	// ID is the stable handle: a container or network id, an image id, a
-	// volume name.
-	ID string
-	// Name is what a human recognises.
-	Name string
-	// Detail is the second line: tags, age, exit code.
+	Kind   Kind
+	ID     string
+	Name   string
 	Detail string
-	// Note is an annotation worth a second look. It never changes the verdict;
-	// it makes the verdict legible before it is confirmed.
+	// Note flags a target worth a second look. It never changes the verdict.
 	Note string
 	Size int64
-	// FreedBy names the containers whose removal made this collectible. When a
-	// container removal fails, everything attributed solely to it is dropped.
+	// FreedBy names the containers whose removal made this collectible.
+	// A failed container removal drops everything attributed solely to it.
 	FreedBy []string
 	// Commands are the exact invocations, in order.
 	Commands [][]string
@@ -120,9 +114,7 @@ type Plan struct {
 	Caches     []CachePlan
 	Kept       []Kept
 
-	// ComposeComplete is false when the compose search could not be
-	// exhaustive. The report says so, because it changes what "not found"
-	// means.
+	// ComposeComplete false changes what "not found" means, so it is reported.
 	ComposeComplete bool
 	ComposeFailures []string
 	SkippedMounts   []string

@@ -10,9 +10,8 @@ import (
 	"github.com/wow-look-at-my/docker-cleaner/internal/dockercli"
 )
 
-// config is the part of `docker compose config --format json` this tool needs.
-// The volume and network keys are the compose file's own keys; the real docker
-// names come from each entry's Name, which compose resolves for us.
+// config is the part of `docker compose config --format json` needed here.
+// Map keys are the compose file's keys; real docker names come from Name.
 type config struct {
 	Name     string `json:"name"`
 	Services map[string]struct {
@@ -40,9 +39,8 @@ type Project struct {
 // Claims is the resolved view of every project found on disk.
 type Claims struct {
 	Projects map[string]*Project
-	// Unreadable maps a file to why it could not be rendered. A project whose
-	// file exists but will not parse is unknown, never absent: a missing
-	// variable must not promote a database to garbage.
+	// Unreadable maps a file to why it would not render. Such a project is
+	// unknown, never absent: a missing variable must not condemn a database.
 	Unreadable map[string]string
 
 	images   map[string]string
@@ -129,9 +127,9 @@ func (c *Claims) add(file string, cfg config) {
 	}
 }
 
-// realName resolves a compose key to the docker name. Compose normally fills
-// in Name, but an older version may not, so the prefix rule is reproduced:
-// project_key, except for an external volume, which is used verbatim.
+// realName resolves a compose key to its docker name. Compose usually fills in
+// Name; older versions do not, hence the project_key rule, with an external
+// name used verbatim.
 func realName(project, key, name string, external bool) string {
 	if name != "" {
 		return name

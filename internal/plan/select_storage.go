@@ -8,8 +8,7 @@ import (
 	"github.com/wow-look-at-my/docker-cleaner/internal/dockercli"
 )
 
-// predefinedNetworks are docker's own. They cannot be removed, so they must
-// never appear in a plan a person is about to confirm.
+// predefinedNetworks cannot be removed, so they never belong in a plan.
 var predefinedNetworks = map[string]bool{"bridge": true, "host": true, "none": true}
 
 // selectVolumes picks volumes nothing will attach.
@@ -199,9 +198,8 @@ func volumeDetail(v dockercli.Volume) string {
 	return "named, no compose project"
 }
 
-// volumeNote flags the volume holding a buildx builder's cache. Removing it
-// discards that whole cache at once rather than ageing it out, which is worth
-// seeing before confirming.
+// volumeNote flags a buildx builder's state volume: removing it discards that
+// builder's whole cache at once instead of ageing it out.
 func volumeNote(v dockercli.Volume) string {
 	if strings.HasPrefix(v.Name, "buildx_buildkit_") {
 		return "buildx builder state: this is that builder's entire cache"

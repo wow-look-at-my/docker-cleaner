@@ -19,9 +19,8 @@ var composeNames = set.Of[string]("compose.yaml",
 // ScanResult is what a walk found and what it could not reach.
 type ScanResult struct {
 	Files []string
-	// Failures are directories or mounts the walk could not read. While this
-	// is non-empty the search was not exhaustive, so "no compose file declares
-	// this project" cannot be read as "the project was deleted".
+	// Failures are places the walk could not read. While any exist the search
+	// was not exhaustive, so "no compose file found" proves nothing.
 	Failures []string
 	Skipped  []Mount
 	Dirs     int

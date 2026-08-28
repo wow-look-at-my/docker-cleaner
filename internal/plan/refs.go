@@ -64,13 +64,11 @@ func buildRefs(containers []dockercli.Container, networks []dockercli.Network, r
 
 // state is what the reference graph concludes about one resource.
 type state struct {
-	// held is true while a container that survives this run still references
-	// the resource.
+	// held: a container surviving this run still references the resource.
 	held bool
-	// by names the containers whose removal frees it, empty when nothing
-	// referenced it in the first place.
+	// by: the containers whose removal frees it, empty if none referenced it.
 	by []string
-	// holders names the survivors keeping it, for the report.
+	// holders: the survivors keeping it, for the report.
 	holders []string
 }
 

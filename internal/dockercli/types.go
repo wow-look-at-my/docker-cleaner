@@ -22,9 +22,8 @@ type Container struct {
 	ID      string `json:"Id"`
 	Created string `json:"Created"`
 	Name    string `json:"Name"`
-	// Image is the resolved sha256 id. Reference counting uses this, never
-	// Config.Image: a container started from myapp:v1 that was since retagged
-	// still holds the old id here.
+	// Image is the resolved sha256 id, and the only sound thing to count
+	// references by: a retagged Config.Image now names a different image.
 	Image string `json:"Image"`
 	State struct {
 		Status     string `json:"Status"`
@@ -114,8 +113,7 @@ type DiskUsage struct {
 	BuildCache []CacheRecord `json:"BuildCache"`
 }
 
-// CacheRecord is one build cache entry, from `docker buildx du --format json`
-// or from DiskUsage.BuildCache.
+// CacheRecord is one build cache entry.
 type CacheRecord struct {
 	ID         string  `json:"ID"`
 	Type       string  `json:"Type"`
@@ -152,15 +150,14 @@ type Snapshot struct {
 	Volumes    []Volume
 	Networks   []Network
 	Caches     []Cache
-	// CacheUnavailable is set when no builder could be enumerated at all, so
-	// the build cache step reports why instead of silently doing nothing.
+	// CacheUnavailable says why no builder could be read, so that step
+	// reports a reason instead of silently doing nothing.
 	CacheUnavailable string
 }
 
-// ParseTime accepts docker's RFC3339Nano timestamps. It reports ok=false for
-// the empty string and for the zero value docker writes into FinishedAt when a
-// container never ran, both of which would otherwise compare as older than any
-// cutoff.
+// ParseTime reads docker's RFC3339Nano timestamps, rejecting the empty string
+// and the zero value FinishedAt carries when a container never ran. Both would
+// otherwise compare as older than every cutoff.
 func ParseTime(s string) (time.Time, bool) {
 	if s == "" {
 		return time.Time{}, false

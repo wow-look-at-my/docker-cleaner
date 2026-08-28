@@ -5,11 +5,9 @@ import (
 	"strings"
 )
 
-// SplitReference separates an image reference into repository and version.
-// The version is what follows the last colon, but only when that tail carries
-// no slash: without that guard localhost:5000/myapp splits into repository
-// "localhost", and every image in a private registry lands in one bogus
-// repository together.
+// SplitReference splits an image reference at the last colon, but only when
+// the tail holds no slash. Without that guard localhost:5000/myapp splits into
+// repository "localhost", collapsing a whole registry into one repository.
 func SplitReference(ref string) (repo, version string) {
 	i := strings.LastIndexByte(ref, ':')
 	if i < 0 {
@@ -21,9 +19,7 @@ func SplitReference(ref string) (repo, version string) {
 	return ref[:i], ref[i+1:]
 }
 
-// IsAnonymousVolume reports whether a volume name is one docker generated.
-// Anonymous names are 64 hex characters; anything else was chosen by a person
-// or by compose.
+// IsAnonymousVolume reports a docker-generated name: 64 hex characters.
 func IsAnonymousVolume(name string) bool {
 	if len(name) != 64 {
 		return false

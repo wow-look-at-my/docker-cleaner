@@ -21,9 +21,8 @@ type Mount struct {
 	Skip string
 }
 
-// pseudoFS are kernel interfaces. Nothing under them is a user's compose
-// project, and walking them wastes time or blocks. tmpfs is deliberately
-// absent: /tmp holds real projects.
+// pseudoFS are kernel interfaces holding no compose projects. tmpfs is
+// deliberately absent: /tmp holds real ones.
 var pseudoFS = set.Of[string]("proc", "sysfs", "devtmpfs", "devpts",
 	"securityfs", "debugfs", "tracefs", "bpf",
 	"pstore", "configfs", "fusectl", "nsfs",
