@@ -1,0 +1,2 @@
+{"Availability":"N/A","Driver":"local","Group":"N/A","Labels":"com.docker.compose.project=webapp","Links":"N/A","Mountpoint":"/var/lib/docker/volumes/webapp_pgdata/_data","Name":"webapp_pgdata","Scope":"local","Size":"N/A","Status":"N/A"}
+{"Availability":"N/A","Driver":"local","Group":"N/A","Labels":"","Links":"N/A","Mountpoint":"/var/lib/docker/volumes/scratch/_data","Name":"scratch","Scope":"local","Size":"N/A","Status":"N/A"}

@@ -1,0 +1,2 @@
+{"CreatedAt":"2026-01-02 09:00:00.1 +0000 UTC","Driver":"bridge","ID":"n0000001","IPv6":"false","Internal":"false","Labels":"com.docker.compose.project=webapp","Name":"webapp_default","Scope":"local"}
+{"CreatedAt":"2025-12-01 00:00:00 +0000 UTC","Driver":"bridge","ID":"n0000002","IPv6":"false","Internal":"false","Labels":"","Name":"bridge","Scope":"local"}

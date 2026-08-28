@@ -1,0 +1,45 @@
+[
+  {
+    "Id": "c0ffee1",
+    "Created": "2026-01-02T09:00:00.123456789Z",
+    "Name": "/webapp-db-1",
+    "Image": "sha256:aaa1",
+    "State": {
+      "Status": "running",
+      "ExitCode": 0,
+      "StartedAt": "2026-08-01T09:00:00.5Z",
+      "FinishedAt": "0001-01-01T00:00:00Z"
+    },
+    "Config": {
+      "Image": "postgres:16",
+      "Labels": {
+        "com.docker.compose.project": "webapp",
+        "com.docker.compose.project.config_files": "/srv/webapp/compose.yaml",
+        "com.docker.compose.project.working_dir": "/srv/webapp",
+        "com.docker.compose.service": "db"
+      }
+    },
+    "HostConfig": {"RestartPolicy": {"Name": "unless-stopped"}},
+    "Mounts": [
+      {"Type": "volume", "Name": "webapp_pgdata", "Destination": "/var/lib/postgresql/data"},
+      {"Type": "bind", "Source": "/srv/webapp/conf", "Destination": "/etc/conf"}
+    ],
+    "NetworkSettings": {"Networks": {"webapp_default": {"NetworkID": "n0000001"}}}
+  },
+  {
+    "Id": "c0ffee2",
+    "Created": "2026-04-10T11:30:00Z",
+    "Name": "/probe",
+    "Image": "sha256:bbb2",
+    "State": {
+      "Status": "exited",
+      "ExitCode": 137,
+      "StartedAt": "2026-04-10T11:30:01Z",
+      "FinishedAt": "2026-05-01T08:00:00Z"
+    },
+    "Config": {"Image": "alpine:3.20", "Labels": {}},
+    "HostConfig": {"RestartPolicy": {"Name": "no"}},
+    "Mounts": [],
+    "NetworkSettings": {"Networks": {"bridge": {"NetworkID": "n0000002"}}}
+  }
+]

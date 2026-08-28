@@ -1,0 +1,5 @@
+build/
+
+# The suite renders this from the .tmpl into its own shared directory; a copy
+# here is the leftover of running the fake docker by hand.
+dats/fixtures/state/container_inspect.json

@@ -1,0 +1,28 @@
+[
+  {
+    "Name": "webapp_default",
+    "Id": "n0000001",
+    "Created": "2026-01-02T09:00:00.1Z",
+    "Scope": "local",
+    "Driver": "bridge",
+    "Ingress": false,
+    "ConfigOnly": false,
+    "ConfigFrom": {"Network": ""},
+    "Containers": {
+      "c0ffee1": {"Name": "webapp-db-1", "EndpointID": "e1"}
+    },
+    "Labels": {"com.docker.compose.project": "webapp", "com.docker.compose.network": "default"}
+  },
+  {
+    "Name": "bridge",
+    "Id": "n0000002",
+    "Created": "2025-12-01T00:00:00Z",
+    "Scope": "local",
+    "Driver": "bridge",
+    "Ingress": false,
+    "ConfigOnly": false,
+    "ConfigFrom": {"Network": ""},
+    "Containers": {},
+    "Labels": {}
+  }
+]

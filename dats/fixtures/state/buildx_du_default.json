@@ -1,0 +1,2 @@
+{"ID":"sha256:cache1","Type":"regular","Size":1048576,"InUse":false,"Shared":false,"CreatedAt":"2020-05-01T10:00:00Z","LastUsedAt":"2020-06-01T10:00:00Z","UsageCount":3}
+{"ID":"sha256:cache2","Type":"exec.cachemount","Size":2097152,"InUse":true,"Shared":false,"CreatedAt":"2020-05-02T10:00:00Z","UsageCount":1}

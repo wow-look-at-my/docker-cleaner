@@ -1,0 +1,1 @@
+{"ID":"sha256:cache3","Parents":[],"CreatedAt":"2026-02-01T10:00:00Z","Mutable":false,"Reclaimable":true,"Shared":false,"Size":4194304,"Description":"[builder 3/7] RUN go mod download","UsageCount":9,"LastUsedAt":"2026-06-01T10:00:00Z","Type":"regular","InUse":false}

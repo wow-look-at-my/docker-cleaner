@@ -1,0 +1,59 @@
+#!/bin/sh
+# A docker that answers reads from canned files and never touches a machine.
+#
+# Reads come from $FAKE_DOCKER_STATE, one file per command. Every mutating call
+# appends its argv to $FAKE_DOCKER_LOG and does nothing else, which is how the
+# suite proves a dry run issues no removals: the file must not exist at all.
+# The caller reads the log rather than stderr, because docker-cleaner captures
+# a child's stderr instead of passing it through. $FAKE_DOCKER_FAIL holds one
+# argv line that fails, standing in for a world that changed mid-run.
+set -eu
+
+state="${FAKE_DOCKER_STATE:-dats/fixtures/state}"
+fail="${FAKE_DOCKER_FAIL:-}"
+log="${FAKE_DOCKER_LOG:-/dev/stderr}"
+
+emit() {
+	if [ -f "$state/$1" ]; then
+		while IFS= read -r line || [ -n "$line" ]; do
+			printf '%s\n' "$line"
+		done < "$state/$1"
+	fi
+}
+
+mutate() {
+	echo "FAKE-DOCKER-EXEC: $*" >> "$log"
+	if [ -n "$fail" ] && [ "$fail" = "$*" ]; then
+		echo "Error response from daemon: fake-docker was told to refuse this" >&2
+		exit 1
+	fi
+}
+
+case "$*" in
+"version --format json") emit version.json ;;
+"system df") emit system_df.txt ;;
+"system df -v --format json") emit system_df_v.json ;;
+"ps -aq --no-trunc") emit ps.txt ;;
+"image ls --no-trunc --format json") emit image_ls.json ;;
+"volume ls --format json") emit volume_ls.json ;;
+"network ls --no-trunc --format json") emit network_ls.json ;;
+"buildx ls --format json") emit buildx_ls.json ;;
+"container inspect "*) emit container_inspect.json ;;
+"image inspect "*) emit image_inspect.json ;;
+"volume inspect "*) emit volume_inspect.json ;;
+"network inspect "*) emit network_inspect.json ;;
+"buildx du --builder "*) emit "buildx_du_$4.json" ;;
+"compose -f "*)
+	if [ -f "$state/compose_config.json" ]; then
+		emit compose_config.json
+	else
+		echo "no configuration file provided" >&2
+		exit 1
+	fi
+	;;
+"rm "* | "rmi "* | "volume rm "* | "network rm "* | "buildx prune"*) mutate "$@" ;;
+*)
+	echo "fake-docker: no fixture for: $*" >&2
+	exit 127
+	;;
+esac
