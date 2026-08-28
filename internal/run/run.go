@@ -18,22 +18,21 @@ import (
 
 // Config is one invocation.
 type Config struct {
-	Options   plan.Options
-	DryRun    bool
-	Yes       bool
-	JSON      bool
-	ShowKept  bool
-	Rescan    bool
-	IndexPath string
-	MountInfo string
+	Options    plan.Options
+	DryRun     bool
+	Yes        bool
+	JSON       bool
+	ShowKept   bool
+	Rescan     bool
+	IndexPath  string
+	MountInfo  string
 	DockerRoot string
 
 	Runner dockercli.Runner
 	Stdout io.Writer
 	Stderr io.Writer
 	Stdin  io.Reader
-	// Interactive is false when nothing can answer a prompt, in which case the
-	// run refuses rather than assuming yes.
+	// Interactive false means nothing can answer a prompt, so the run refuses.
 	Interactive bool
 	Now         time.Time
 }
@@ -54,7 +53,10 @@ func Do(ctx context.Context, c Config) int {
 		return emitJSON(ctx, c, p)
 	}
 
-	report.Text(c.Stdout, p, snap.BeforeText, c.DryRun, c.ShowKept)
+	if err := report.Text(c.Stdout, p, snap.BeforeText, c.DryRun, c.ShowKept); err != nil {
+		fmt.Fprintln(c.Stderr, "docker-cleaner:", err)
+		return ExitEnvironment
+	}
 	if p.Empty() || c.DryRun {
 		return ExitOK
 	}
@@ -124,9 +126,7 @@ func apply(ctx context.Context, c Config, p plan.Plan, log io.Writer) ([]report.
 		}
 	}
 
-	// A container that failed to go still holds its image, volume and network.
-	// Dropping what it would have freed is what stops this tool from trying to
-	// delete a volume that is, as of a moment ago, mounted.
+	// A container that would not go still holds its image, volume and network.
 	rest := append(append(append([]plan.Target{}, p.Images...), p.Volumes...), p.Networks...)
 	for _, t := range rest {
 		if blocked, by := blockedBy(t, notRemoved); blocked {

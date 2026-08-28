@@ -18,10 +18,10 @@ import (
 var Version = "dev"
 
 var opts struct {
-	dryRun     bool
-	age        string
-	cacheAge   string
-	yes        bool
+	dryRun       bool
+	age          string
+	cacheAge     string
+	yes          bool
 	noContainers bool
 	noImages     bool
 	noVolumes    bool
