@@ -1,0 +1,2 @@
+{"Driver":"bridge","ID":"n1","Name":"bridge","Scope":"local"}
+{"Driver":"bridge","ID":"n2","Name":"orphan_default","Scope":"local"}

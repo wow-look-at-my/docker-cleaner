@@ -1,0 +1,35 @@
+[
+  {
+    "Id": "c1",
+    "Name": "/web-old",
+    "Image": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "Created": "@@OLD@@",
+    "State": {"Status": "exited", "ExitCode": 0, "StartedAt": "@@OLD@@", "FinishedAt": "@@OLD@@"},
+    "Config": {"Image": "myapp:v1", "Labels": {}},
+    "HostConfig": {"RestartPolicy": {"Name": "no"}},
+    "Mounts": [],
+    "NetworkSettings": {"Networks": {}}
+  },
+  {
+    "Id": "c2",
+    "Name": "/db-live",
+    "Image": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+    "Created": "@@OLD@@",
+    "State": {"Status": "running", "ExitCode": 0, "StartedAt": "@@RECENT@@", "FinishedAt": "0001-01-01T00:00:00Z"},
+    "Config": {"Image": "postgres:16", "Labels": {}},
+    "HostConfig": {"RestartPolicy": {"Name": "unless-stopped"}},
+    "Mounts": [{"Type": "volume", "Name": "pgdata-live"}, {"Type": "bind", "Source": "/srv/conf"}],
+    "NetworkSettings": {"Networks": {"bridge": {"NetworkID": "n1"}}}
+  },
+  {
+    "Id": "c3",
+    "Name": "/probe-recent",
+    "Image": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+    "Created": "@@OLD@@",
+    "State": {"Status": "exited", "ExitCode": 137, "StartedAt": "@@RECENT@@", "FinishedAt": "@@RECENT@@"},
+    "Config": {"Image": "myapp:v2", "Labels": {}},
+    "HostConfig": {"RestartPolicy": {"Name": "no"}},
+    "Mounts": [],
+    "NetworkSettings": {"Networks": {}}
+  }
+]

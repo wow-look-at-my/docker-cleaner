@@ -1,0 +1,12 @@
+[
+  {
+    "Name": "bridge", "Id": "n1", "Scope": "local", "Driver": "bridge",
+    "Ingress": false, "ConfigOnly": false, "ConfigFrom": {"Network": ""},
+    "Containers": {"c2": {"Name": "db-live"}}, "Labels": {}
+  },
+  {
+    "Name": "orphan_default", "Id": "n2", "Scope": "local", "Driver": "bridge",
+    "Ingress": false, "ConfigOnly": false, "ConfigFrom": {"Network": ""},
+    "Containers": {}, "Labels": {}
+  }
+]

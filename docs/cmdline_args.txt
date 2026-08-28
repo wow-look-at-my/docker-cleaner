@@ -1,0 +1,59 @@
+Remove docker resources nothing will use again.
+
+Deletes containers offline past a threshold, images no longer reachable except
+the newest of each repository, volumes and networks nothing will attach, and
+build cache nothing has touched lately.
+
+A compose project still on disk keeps everything it would attach on its next
+up, so a stack that is merely down is safe. Deleting its compose file is what
+retires a project.
+
+Usage:
+  docker-cleaner [flags]
+  docker-cleaner [command]
+
+Available Commands:
+  watch       Record compose projects as docker creates their containers
+
+Flags:
+      --age string               remove containers offline longer than this (30d, 4w, 720h, 1h30m) (default "30d")
+      --build-cache-age string   remove build cache unused longer than this (default "7d")
+      --docker-bin string        docker executable to run (default "docker")
+      --docker-root string       docker's storage root, excluded from the search (default "/var/lib/docker")
+      --dry-run                  show the plan and remove nothing
+  -h, --help                     help for docker-cleaner
+      --index string             where the compose project index lives (default "/var/lib/docker-cleaner/projects.json")
+      --json                     emit the plan as JSON, including every command's argv
+      --keep stringArray         keep images matching this glob (repeatable)
+      --mountinfo string         mount table naming the filesystems to search (default "/proc/self/mountinfo")
+      --no-build-cache           leave build cache alone
+      --no-containers            leave containers alone
+      --no-images                leave images alone
+      --no-networks              leave networks alone
+      --no-volumes               leave volumes alone
+      --rescan                   walk the disk for compose files even if the index answers
+      --show-kept                list every kept resource instead of counts
+      --timeout duration         timeout for one docker invocation (default 2m0s)
+  -v, --version                  version for docker-cleaner
+  -y, --yes                      apply without confirming
+
+Use "docker-cleaner [command] --help" for more information about a command.
+
+Record compose projects as docker creates their containers.
+
+Docker names a project's compose files on the containers it creates and forgets
+them when those containers go. Running this keeps the record, so a stack that
+was up and then down between two cleanups is still recognised without searching
+the disk for it.
+
+It is an optimisation, never a requirement: a project this misses is simply
+unresolved, and an unresolved project falls through to the filesystem search.
+
+Usage:
+  docker-cleaner watch [flags]
+
+Flags:
+      --docker-bin string   docker executable to run (default "docker")
+  -h, --help                help for watch
+      --index string        where the compose project index lives (default "/var/lib/docker-cleaner/projects.json")
+

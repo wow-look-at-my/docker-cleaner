@@ -124,6 +124,7 @@ func init() {
 	f.StringVar(&opts.mountInfo, "mountinfo", compose.DefaultMountInfo, "mount table naming the filesystems to search")
 	f.StringVar(&opts.dockerRoot, "docker-root", "/var/lib/docker", "docker's storage root, excluded from the search")
 	rootCmd.Version = Version
+	rootCmd.CompletionOptions.DisableDefaultCmd = true
 }
 
 // Execute runs the command line and returns the process exit code.
