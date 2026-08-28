@@ -31,8 +31,8 @@ type docker struct {
 
 func newDocker() *docker {
 	return &docker{fail: map[string]string{}, reads: map[string]string{
-		"version --format json":  `{"Client":{"Version":"29.3.1"},"Server":{"Version":"29.3.1"}}`,
-		"system df":              "TYPE     TOTAL  ACTIVE  SIZE   RECLAIMABLE\nImages   2      1       384MB  134MB\n",
+		"version --format json": `{"Client":{"Version":"29.3.1"},"Server":{"Version":"29.3.1"}}`,
+		"system df":             "TYPE     TOTAL  ACTIVE  SIZE   RECLAIMABLE\nImages   2      1       384MB  134MB\n",
 		"system df -v --format json": `{"LayersSize":1,"Images":[{"Id":"sha256:i1","Size":268435456}],` +
 			`"Containers":[{"Id":"c1","SizeRw":4096}],"Volumes":[],"BuildCache":[]}`,
 		"ps -aq --no-trunc": "c1\n",
@@ -293,16 +293,22 @@ func TestAQuietRunNeedsNoConfirmation(t *testing.T) {
 	assert.Contains(t, stdout.String(), "Nothing to remove.")
 }
 
-// The index is what keeps the next run to stat calls, so a run has to write it.
+// The index is what keeps the next run to stat calls: a live container names
+// its compose files, and the tool writes that down for after the down.
 func TestTheRunPersistsWhatItLearned(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "compose.yaml")
+	require.NoError(t, os.WriteFile(file, []byte("services: {}\n"), 0o644))
+
 	d := newDocker()
 	d.reads["container inspect c1"] = `[{"Id":"c1","Name":"/webapp-db-1","Image":"sha256:i1",` +
 		`"Created":"` + ago(2*24*time.Hour) + `",` +
 		`"State":{"Status":"running","FinishedAt":"0001-01-01T00:00:00Z"},` +
 		`"Config":{"Image":"myapp:v1","Labels":{` +
 		`"com.docker.compose.project":"webapp",` +
-		`"com.docker.compose.project.config_files":"/srv/webapp/compose.yaml"}},` +
-		`"Mounts":[],"NetworkSettings":{"Networks":{}}}]`
+		`"com.docker.compose.project.config_files":"` + file + `"}},` +
+		`"Mounts":[{"Type":"volume","Name":"webapp_pgdata"}],"NetworkSettings":{"Networks":{}}}]`
+	d.reads["compose -f "+file+" config --format json"] =
+		`{"name":"webapp","services":{"db":{"image":"myapp:v1"}},"volumes":{"pgdata":{}}}`
 	c, _, _ := config(t, d)
 	c.DryRun = true
 
@@ -310,5 +316,33 @@ func TestTheRunPersistsWhatItLearned(t *testing.T) {
 
 	body, err := os.ReadFile(c.IndexPath)
 	require.NoError(t, err)
-	assert.Contains(t, string(body), "/srv/webapp/compose.yaml")
+	assert.Contains(t, string(body), file)
+}
+
+// A project the index cannot explain is worth a walk; one it can is not. This
+// is the whole speed claim, and it is asserted on the directory count.
+func TestAKnownProjectCostsNoWalk(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "compose.yaml")
+	require.NoError(t, os.WriteFile(file, []byte("services: {}\n"), 0o644))
+
+	d := newDocker()
+	d.reads["volume ls --format json"] = `{"Name":"webapp_pgdata"}` + "\n"
+	d.reads["volume inspect webapp_pgdata"] = `[{"Name":"webapp_pgdata","Driver":"local","Scope":"local",` +
+		`"Labels":{"com.docker.compose.project":"webapp"}}]`
+	d.reads["compose -f "+file+" config --format json"] =
+		`{"name":"webapp","volumes":{"pgdata":{}}}`
+	c, stdout, _ := config(t, d)
+	c.DryRun = true
+	c.MountInfo = filepath.Join(t.TempDir(), "mountinfo")
+	require.NoError(t, os.WriteFile(c.MountInfo,
+		[]byte("27 1 259:2 / "+dir+" rw,relatime shared:1 - ext4 /dev/nvme0n1p2 rw\n"), 0o644))
+
+	// The first run learns the project from the walk, the second from the index.
+	require.Equal(t, ExitOK, Do(context.Background(), c))
+	stdout.Reset()
+	require.Equal(t, ExitOK, Do(context.Background(), c))
+
+	assert.Contains(t, stdout.String(), "0 directories walked")
+	assert.NotContains(t, stdout.String(), "webapp_pgdata")
 }

@@ -1,0 +1,34 @@
+docker-cleaner   DRY RUN
+containers offline over 30d (before 2026-07-29 12:00 UTC)
+build cache unused over 7d (before 2026-08-21 12:00 UTC)
+compose projects: search complete, 0 directories walked
+
+CONTAINERS TO REMOVE  (1, 4.1kB)
+  web-old                                       4.1kB  exited 47d ago
+      note: restart policy unless-stopped
+
+IMAGES TO REMOVE  (1, 268.4MB)
+  myapp:v1                                    268.4MB  created 200d ago
+      freed by removing web-old
+
+VOLUMES TO REMOVE  (1, 1.0kB)
+  scratch                                       1.0kB  no compose project
+
+NETWORKS TO REMOVE  (1, 0B)
+  orphan_default                                   0B  no attached containers
+
+BUILD CACHE
+  default                                       1.0MB  3 records unused in 168h
+      will run: docker buildx prune --force --filter until=168h
+  ci-builder                                    4.2MB  1 record unused in 168h
+      will run: docker buildx prune --builder ci-builder --force --filter until=168h
+
+KEPT
+  webapp-db-1                              container    running
+  myapp:v2                                 image        newest in its repository
+  nginx:latest                             image        tagged latest
+  webapp_pgdata                            volume       claimed by a compose project still on disk (webapp)
+
+TOTAL  273.7MB reclaimable
+
+Dry run: nothing was removed.

@@ -25,11 +25,13 @@ var doc = template.Must(template.New("report").Funcs(template.FuncMap{
 containers offline over {{age .Plan.Age}} (before {{cutoff .Plan}})
 build cache unused over {{age .Plan.BuildCacheAge}} (before {{cacheCutoff .Plan}})
 compose projects: {{.Completeness}}, {{.Plan.DirsWalked}} directories walked
-{{if .Before}}
+{{- if .Before}}
+
 BEFORE
 {{trim .Before}}
-{{end}}
+{{- end}}
 {{- range .Sections}}{{if .Targets}}
+
 {{.Title}}  ({{len .Targets}}, {{bytes (total .Targets)}})
 {{- range .Targets}}
   {{printf "%-40s" .Name}} {{printf "%10s" (bytes .Size)}}  {{.Detail}}
@@ -40,29 +42,33 @@ BEFORE
       note: {{.Note}}
   {{- end}}
 {{- end}}
-{{end}}{{end}}
+{{- end}}{{end}}
 {{- if .Plan.Caches}}
+
 BUILD CACHE
 {{- range .Plan.Caches}}
-  {{printf "%-40s" (builder .Builder)}} {{printf "%10s" (bytes .Size)}}  {{.Records}} records unused in {{.Until}}
+  {{printf "%-40s" (builder .Builder)}} {{printf "%10s" (bytes .Size)}}  {{.Records}} record{{if ne .Records 1}}s{{end}} unused in {{.Until}}
       will run: {{argv .Command}}
 {{- end}}
-{{end}}
+{{- end}}
 {{- if .Kept}}
+
 KEPT
 {{- range .Kept}}
   {{.}}
 {{- end}}
-{{end}}
+{{- end}}
 {{- range .Plan.ComposeFailures}}
 COULD NOT SEARCH: {{.}}
 {{- end}}
 {{- range .Plan.Warnings}}
 WARNING: {{.}}
 {{- end}}
-{{if .Plan.Empty}}
+{{- if .Plan.Empty}}
+
 Nothing to remove.
 {{- else}}
+
 TOTAL  {{bytes .Plan.Reclaimable}} reclaimable
 {{- if .DryRun}}
 
