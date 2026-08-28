@@ -1,0 +1,23 @@
+[
+  {
+    "CreatedAt": "2026-01-02T09:00:00Z",
+    "Driver": "local",
+    "Labels": {
+      "com.docker.compose.project": "webapp",
+      "com.docker.compose.volume": "pgdata"
+    },
+    "Mountpoint": "/var/lib/docker/volumes/webapp_pgdata/_data",
+    "Name": "webapp_pgdata",
+    "Options": null,
+    "Scope": "local"
+  },
+  {
+    "CreatedAt": "2026-04-10T11:30:00Z",
+    "Driver": "local",
+    "Labels": null,
+    "Mountpoint": "/var/lib/docker/volumes/scratch/_data",
+    "Name": "scratch",
+    "Options": null,
+    "Scope": "local"
+  }
+]

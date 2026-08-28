@@ -1,0 +1,18 @@
+[
+  {
+    "Id": "sha256:aaa1",
+    "RepoTags": ["postgres:16", "postgres:latest"],
+    "RepoDigests": ["postgres@sha256:dddd"],
+    "Parent": "",
+    "Created": "2026-07-20T10:11:12.5Z",
+    "Size": 268435456
+  },
+  {
+    "Id": "sha256:bbb2",
+    "RepoTags": ["alpine:3.20"],
+    "RepoDigests": [],
+    "Parent": "sha256:aaa1",
+    "Created": "2026-08-01T08:00:00Z",
+    "Size": 134217728
+  }
+]
