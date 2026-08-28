@@ -19,6 +19,8 @@ const (
 // Discovery is the compose picture for one run.
 type Discovery struct {
 	Claims *Claims
+	// Index is carried so the caller can persist what this run learned.
+	Index *Index
 	// Complete false means an unresolved project is unknown, not deleted.
 	Complete bool
 	Failures []string
@@ -44,8 +46,8 @@ type Options struct {
 // filesystem walk, which is what keeps an ordinary run to a handful of stat
 // calls.
 func Discover(ctx context.Context, r dockercli.Runner, containers []dockercli.Container, wanted []string, o Options) *Discovery {
-	d := &Discovery{Complete: true}
 	idx := o.Index
+	d := &Discovery{Complete: true, Index: idx}
 
 	for _, c := range containers {
 		project := c.Config.Labels[LabelProject]
