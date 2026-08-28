@@ -2,6 +2,7 @@ package dockercli
 
 import (
 	"context"
+	"github.com/stretchr/testify/require"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,15 +14,13 @@ import (
 func fixture(t *testing.T, name string) []byte {
 	t.Helper()
 	b, err := os.ReadFile(filepath.Join("testdata", name))
-	if err != nil {
-		t.Fatalf("fixture %s: %v", name, err)
-	}
+	require.Nil(t, err)
+
 	usedFixtures.Add(name)
 	return b
 }
 
-// usedFixtures records what the suite reads, so a fixture nothing names shows
-// up as a failure rather than as coverage.
+// usedFixtures records what the suite reads; see TestEveryFixtureIsUsed.
 var usedFixtures = &nameSet{m: map[string]bool{}}
 
 type nameSet struct {
@@ -46,8 +45,7 @@ type fake struct {
 	t     *testing.T
 	mu    sync.Mutex
 	calls [][]string
-	// override replaces the fixture answer for calls whose argv starts with
-	// the key, which is how a test injects a failure.
+	// override answers calls whose argv starts with the key, injecting failures.
 	override map[string]func() ([]byte, []byte, error)
 }
 
@@ -97,17 +95,6 @@ func (f *fake) answer(args []string, joined string) ([]byte, []byte, error) {
 	}
 	f.t.Fatalf("fake docker got an unexpected call: docker %s", joined)
 	return nil, nil, nil
-}
-
-// argvs returns every recorded call joined for easy matching.
-func (f *fake) argvs() []string {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	var out []string
-	for _, c := range f.calls {
-		out = append(out, strings.Join(c, " "))
-	}
-	return out
 }
 
 func (f *fake) callsWithPrefix(prefix string) [][]string {

@@ -11,8 +11,7 @@ func TestSplitReference(t *testing.T) {
 		{"nginx:1.25", "nginx", "1.25"},
 		{"myapp:latest", "myapp", "latest"},
 		{"org/myapp:v1", "org/myapp", "v1"},
-		// The registry port is a colon that is not a tag separator. Splitting
-		// on it would collapse a whole registry into repository "localhost".
+		// A registry port is a colon that is not a tag separator.
 		{"localhost:5000/myapp:v1", "localhost:5000/myapp", "v1"},
 		{"localhost:5000/myapp", "localhost:5000/myapp", ""},
 		{"nginx", "nginx", ""},

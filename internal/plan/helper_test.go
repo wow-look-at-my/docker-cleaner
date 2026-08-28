@@ -8,8 +8,7 @@ import (
 	"github.com/wow-look-at-my/docker-cleaner/internal/dockercli"
 )
 
-// now is the single clock reading every test computes against, so a plan is
-// reproducible.
+// now is the one clock reading every test computes against.
 var now = time.Date(2026, 8, 28, 12, 0, 0, 0, time.UTC)
 
 func ago(d time.Duration) string { return now.Add(-d).Format(time.RFC3339Nano) }

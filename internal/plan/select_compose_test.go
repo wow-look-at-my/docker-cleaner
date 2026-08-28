@@ -11,8 +11,7 @@ import (
 	"github.com/wow-look-at-my/docker-cleaner/internal/dockercli"
 )
 
-// composeRunner answers `docker compose config` from a canned project so the
-// selection tests exercise the real claim resolution.
+// composeRunner answers `docker compose config` from a canned project.
 type composeRunner struct{ json string }
 
 func (r composeRunner) Run(context.Context, ...string) ([]byte, []byte, error) {
