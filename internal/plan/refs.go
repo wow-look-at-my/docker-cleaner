@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/wow-look-at-my/docker-cleaner/internal/dockercli"
+	"github.com/wow-look-at-my/go-containers/set"
 )
 
 // refs maps each resource to the containers referencing it, across every
@@ -77,12 +78,12 @@ func (r *refs) status(ids []string) state {
 		return state{}
 	}
 	var freed, held []string
-	seen := map[string]bool{}
+	seen := set.New[string]()
 	for _, id := range ids {
-		if seen[id] {
+		if seen.Contains(id) {
 			continue
 		}
-		seen[id] = true
+		seen.Add(id)
 		name := r.names[id]
 		if name == "" {
 			name = ShortID(id)

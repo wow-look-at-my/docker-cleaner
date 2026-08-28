@@ -6,10 +6,11 @@ import (
 
 	"github.com/wow-look-at-my/docker-cleaner/internal/compose"
 	"github.com/wow-look-at-my/docker-cleaner/internal/dockercli"
+	"github.com/wow-look-at-my/go-containers/set"
 )
 
 // predefinedNetworks cannot be removed, so they never belong in a plan.
-var predefinedNetworks = map[string]bool{"bridge": true, "host": true, "none": true}
+var predefinedNetworks = set.Of[string]("bridge", "host", "none")
 
 // selectVolumes picks volumes nothing will attach.
 //
@@ -72,16 +73,16 @@ func (b *builder) selectNetworks() {
 	networks := append([]dockercli.Network(nil), b.snap.Networks...)
 	sort.Slice(networks, func(i, j int) bool { return networks[i].Name < networks[j].Name })
 
-	configFrom := map[string]bool{}
+	configFrom := set.New[string]()
 	for _, n := range networks {
 		if n.ConfigFrom.Network != "" {
-			configFrom[n.ConfigFrom.Network] = true
+			configFrom.Add(n.ConfigFrom.Network)
 		}
 	}
 
 	for _, n := range networks {
 		switch {
-		case predefinedNetworks[n.Name], n.Driver == "null", n.Driver == "host":
+		case predefinedNetworks.Contains(n.Name), n.Driver == "null", n.Driver == "host":
 			b.keep(KindNetwork, n.Name, ReasonPredefined, n.Driver)
 			continue
 		case n.Scope != "" && n.Scope != "local":
@@ -90,7 +91,7 @@ func (b *builder) selectNetworks() {
 		case n.Ingress:
 			b.keep(KindNetwork, n.Name, ReasonIngress, "")
 			continue
-		case n.ConfigOnly, configFrom[n.Name]:
+		case n.ConfigOnly, configFrom.Contains(n.Name):
 			b.keep(KindNetwork, n.Name, ReasonConfigOnly, "")
 			continue
 		}
