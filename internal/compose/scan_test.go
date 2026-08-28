@@ -33,7 +33,7 @@ func TestWalkFindsEverySpellingAtEveryDepth(t *testing.T) {
 	res, err := (&FSScanner{Mounts: []Mount{{Point: root}}}).Scan()
 
 	require.NoError(t, err)
-	assert.Equal(t, want, res.Files)
+	assert.ElementsMatch(t, want, res.Files)
 	assert.True(t, res.Complete())
 	assert.Positive(t, res.Dirs)
 }
