@@ -18,8 +18,7 @@ import (
 // DefaultIndexPath is where the project index lives.
 const DefaultIndexPath = "/var/lib/docker-cleaner/projects.json"
 
-// indexSchema is bumped when the on-disk shape changes. A newer file is
-// discarded, never half-read.
+// indexSchema rises with the on-disk shape; a newer file is discarded.
 const indexSchema = 1
 
 // Entry is one project's known compose files.
@@ -35,8 +34,7 @@ type Index struct {
 
 	path     string
 	readOnly bool
-	// Warning says why the index could not persist, so a run that lost its
-	// speed advantage says so rather than just being slow.
+	// Warning says why the index could not persist.
 	Warning string
 }
 

@@ -19,8 +19,7 @@ var composeNames = set.Of[string]("compose.yaml",
 // ScanResult is what a walk found and what it could not reach.
 type ScanResult struct {
 	Files []string
-	// Failures are places the walk could not read. While any exist the search
-	// was not exhaustive, so "no compose file found" proves nothing.
+	// Failures are places the walk could not read; any means not exhaustive.
 	Failures []string
 	Skipped  []Mount
 	Dirs     int

@@ -39,8 +39,7 @@ type Project struct {
 // Claims is the resolved view of every project found on disk.
 type Claims struct {
 	Projects map[string]*Project
-	// Unreadable maps a file to why it would not render. Such a project is
-	// unknown, never absent: a missing variable must not condemn a database.
+	// Unreadable maps a file to why it would not render: unknown, not absent.
 	Unreadable map[string]string
 
 	images   map[string]string
@@ -127,9 +126,8 @@ func (c *Claims) add(file string, cfg config) {
 	}
 }
 
-// realName resolves a compose key to its docker name. Compose usually fills in
-// Name; older versions do not, hence the project_key rule, with an external
-// name used verbatim.
+// realName resolves a compose key to its docker name: Name when compose set
+// it, the key when external, else project_key.
 func realName(project, key, name string, external bool) string {
 	if name != "" {
 		return name

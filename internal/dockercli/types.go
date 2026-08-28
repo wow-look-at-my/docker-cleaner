@@ -22,8 +22,7 @@ type Container struct {
 	ID      string `json:"Id"`
 	Created string `json:"Created"`
 	Name    string `json:"Name"`
-	// Image is the resolved sha256 id, and the only sound thing to count
-	// references by: a retagged Config.Image now names a different image.
+	// Image is the resolved id; a retagged Config.Image names another.
 	Image string `json:"Image"`
 	State struct {
 		Status     string `json:"Status"`
@@ -150,8 +149,7 @@ type Snapshot struct {
 	Volumes    []Volume
 	Networks   []Network
 	Caches     []Cache
-	// CacheUnavailable says why no builder could be read, so that step
-	// reports a reason instead of silently doing nothing.
+	// CacheUnavailable says why no builder could be read.
 	CacheUnavailable string
 }
 

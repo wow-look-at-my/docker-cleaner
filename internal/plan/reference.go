@@ -5,9 +5,8 @@ import (
 	"strings"
 )
 
-// SplitReference splits an image reference at the last colon, but only when
-// the tail holds no slash. Without that guard localhost:5000/myapp splits into
-// repository "localhost", collapsing a whole registry into one repository.
+// SplitReference splits at the last colon, but only when the tail holds no
+// slash: else localhost:5000/myapp becomes repository "localhost".
 func SplitReference(ref string) (repo, version string) {
 	i := strings.LastIndexByte(ref, ':')
 	if i < 0 {
@@ -33,9 +32,8 @@ func IsAnonymousVolume(name string) bool {
 	return true
 }
 
-// MatchKeep reports the first --keep pattern matching any of a resource's
-// names. Patterns are globs, and * deliberately crosses /, so registry.local/*
-// covers a whole registry.
+// MatchKeep reports the first --keep glob matching a name. * crosses /, so
+// registry.local/* covers a whole registry.
 func MatchKeep(patterns, names []string) string {
 	for _, p := range patterns {
 		for _, n := range names {

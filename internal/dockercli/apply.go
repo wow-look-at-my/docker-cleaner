@@ -5,8 +5,7 @@ import (
 	"strings"
 )
 
-// RemoveContainer removes one container. No -f (it would kill a running
-// container) and no -v (it would take volumes the plan never listed).
+// RemoveContainer removes one container. Never -f (kills running) or -v.
 func RemoveContainer(id string) []string { return []string{"rm", id} }
 
 // RemoveImageRef removes one reference; an id with several tags needs each.

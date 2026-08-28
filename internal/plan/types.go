@@ -76,7 +76,6 @@ type Target struct {
 	Note string
 	Size int64
 	// FreedBy names the containers whose removal made this collectible.
-	// A failed container removal drops everything attributed solely to it.
 	FreedBy []string
 	// Commands are the exact invocations, in order.
 	Commands [][]string

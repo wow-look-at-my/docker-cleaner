@@ -15,9 +15,7 @@ type Mount struct {
 	Point  string
 	FSType string
 	Device string
-	// Skip is empty when the mount is walked, otherwise it says why not. Every
-	// skip is reported: choosing not to look somewhere is a judgement, and it
-	// should be visible rather than assumed.
+	// Skip says why a mount is not walked; every skip is reported.
 	Skip string
 }
 

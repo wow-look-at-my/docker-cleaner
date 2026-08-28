@@ -23,8 +23,7 @@ type Discovery struct {
 	Complete bool
 	Failures []string
 	Skipped  []Mount
-	// DirsWalked is zero when the index answered everything; the report prints
-	// it so the speed claim stays checkable.
+	// DirsWalked is zero when the index answered everything.
 	DirsWalked int
 	Warning    string
 }
