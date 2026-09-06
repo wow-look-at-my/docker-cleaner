@@ -16,7 +16,7 @@ import (
 // forbiddenScanner fails the test if the run walks the disk at all.
 type forbiddenScanner struct{ t *testing.T }
 
-func (s forbiddenScanner) Scan() (ScanResult, error) {
+func (s forbiddenScanner) Scan(context.Context) (ScanResult, error) {
 	s.t.Fatal("the index answered every project, so nothing should have walked the disk")
 	return ScanResult{}, nil
 }
@@ -27,7 +27,7 @@ type stubScanner struct {
 	called int
 }
 
-func (s *stubScanner) Scan() (ScanResult, error) {
+func (s *stubScanner) Scan(context.Context) (ScanResult, error) {
 	s.called++
 	return s.res, s.err
 }

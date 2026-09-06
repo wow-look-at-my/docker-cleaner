@@ -32,7 +32,7 @@ func image(id, created string, tags ...string) dockercli.Image {
 // noComposeFiles is discovery on a machine with no compose projects at all,
 // having searched exhaustively.
 func noComposeFiles() *compose.Discovery {
-	return &compose.Discovery{Claims: compose.Resolve(context.Background(), nil, nil), Complete: true}
+	return &compose.Discovery{Claims: compose.Resolve(context.Background(), nil, nil, nil), Complete: true}
 }
 
 // incompleteSearch is discovery that could not look everywhere.

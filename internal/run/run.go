@@ -13,6 +13,7 @@ import (
 	"github.com/wow-look-at-my/docker-cleaner/internal/compose"
 	"github.com/wow-look-at-my/docker-cleaner/internal/dockercli"
 	"github.com/wow-look-at-my/docker-cleaner/internal/plan"
+	"github.com/wow-look-at-my/docker-cleaner/internal/progress"
 	"github.com/wow-look-at-my/docker-cleaner/internal/report"
 )
 
@@ -27,11 +28,15 @@ type Config struct {
 	IndexPath  string
 	MountInfo  string
 	DockerRoot string
+	// ScanTimeout bounds the compose search. Past it the search is incomplete.
+	ScanTimeout time.Duration
 
 	Runner dockercli.Runner
 	Stdout io.Writer
 	Stderr io.Writer
 	Stdin  io.Reader
+	// Progress says what the run is doing. A nil reporter says nothing.
+	Progress *progress.Reporter
 	// Interactive false means nothing can answer a prompt, so the run refuses.
 	Interactive bool
 	Now         time.Time
@@ -39,15 +44,19 @@ type Config struct {
 
 // Do performs a run and returns the process exit code.
 func Do(ctx context.Context, c Config) int {
-	snap, err := dockercli.Read(ctx, c.Runner)
+	snap, err := dockercli.Read(ctx, c.Runner, c.Progress)
 	if err != nil {
+		c.Progress.Stop()
 		fmt.Fprintln(c.Stderr, "docker-cleaner:", err)
 		return ExitEnvironment
 	}
 
 	disco := discover(ctx, c, snap)
+	c.Progress.Stage("deciding what to remove")
 	p := plan.Compute(snap, disco, c.Options, c.Now)
 	defer saveIndex(disco)
+	// The report owns the screen from here on.
+	c.Progress.Stop()
 
 	if c.JSON {
 		return emitJSON(ctx, c, p)
@@ -85,8 +94,20 @@ func Do(ctx context.Context, c Config) int {
 
 // discover resolves compose projects. The scanner is handed the mount table
 // but only runs if some project the index cannot explain remains.
+//
+// The search gets its own deadline. A walk of a whole machine, or a read of a
+// directory on a mount whose server is gone, can outlast anybody's patience,
+// and the answer it owes the plan already has a safe shape: an incomplete
+// search keeps every project it could not resolve.
 func discover(ctx context.Context, c Config, snap dockercli.Snapshot) *compose.Discovery {
+	c.Progress.Stage("looking for compose projects")
 	idx := compose.LoadIndex(c.IndexPath)
+
+	if c.ScanTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, c.ScanTimeout)
+		defer cancel()
+	}
 
 	var scanner compose.Scanner
 	mounts, err := compose.ReadMounts(c.MountInfo, c.DockerRoot)
@@ -94,18 +115,19 @@ func discover(ctx context.Context, c Config, snap dockercli.Snapshot) *compose.D
 		// Without a mount table the search cannot be exhaustive, so say so
 		// rather than letting a missing file read as "no projects exist".
 		return &compose.Discovery{
-			Claims:   compose.Resolve(ctx, c.Runner, nil),
+			Claims:   compose.Resolve(ctx, c.Runner, nil, c.Progress),
 			Complete: false,
 			Failures: []string{"cannot read " + c.MountInfo + ": " + err.Error()},
 		}
 	}
-	scanner = &compose.FSScanner{Mounts: mounts}
+	scanner = &compose.FSScanner{Mounts: mounts, Progress: c.Progress}
 
 	return compose.Discover(ctx, c.Runner, snap.Containers, plan.ComposeProjects(snap), compose.Options{
-		Index:   idx,
-		Scanner: scanner,
-		Rescan:  c.Rescan,
-		Now:     c.Now,
+		Index:    idx,
+		Scanner:  scanner,
+		Rescan:   c.Rescan,
+		Now:      c.Now,
+		Progress: c.Progress,
 	})
 }
 
@@ -186,10 +208,9 @@ func blockedBy(t plan.Target, notRemoved map[string]bool) (bool, string) {
 	return true, strings.Join(t.FreedBy, ", ")
 }
 
-// emitJSON prints a document. With --yes it applies before printing, and
-// records what
-// actually ran, so the operations array is history rather than intent; the
-// apply log goes to stderr to keep stdout parseable.
+// emitJSON prints a document. With --yes it applies before printing and records
+// what actually ran, so the operations array is history rather than intent. The
+// apply log goes to stderr, which keeps stdout parseable.
 func emitJSON(ctx context.Context, c Config, p plan.Plan) int {
 	doc := report.Build(p, c.DryRun)
 	code := ExitOK

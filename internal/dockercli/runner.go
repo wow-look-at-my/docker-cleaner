@@ -8,6 +8,8 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/wow-look-at-my/docker-cleaner/internal/progress"
 )
 
 // inspectChunk keeps a host with thousands of objects under ARG_MAX.
@@ -123,10 +125,13 @@ func decodeNDJSON[T any](out []byte, what string) ([]T, error) {
 
 // inspect batches ids through `docker <kind> inspect`. An empty id list issues
 // no call at all, because docker treats a bare inspect as a usage error.
-func inspect[T any](ctx context.Context, r Runner, kind string, ids []string) ([]T, error) {
+func inspect[T any](ctx context.Context, r Runner, kind string, ids []string, p *progress.Reporter) ([]T, error) {
 	var all []T
 	for start := 0; start < len(ids); start += inspectChunk {
 		end := min(start+inspectChunk, len(ids))
+		if len(ids) > inspectChunk {
+			p.Stage("inspecting %ss (%d of %d)", kind, end, len(ids))
+		}
 		args := append([]string{kind, "inspect"}, ids[start:end]...)
 		out, errb, err := r.Run(ctx, args...)
 		if err != nil && !missingObject(errb) {

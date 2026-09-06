@@ -5,11 +5,15 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/signal"
+	"strings"
+	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/wow-look-at-my/docker-cleaner/internal/compose"
 	"github.com/wow-look-at-my/docker-cleaner/internal/plan"
+	"github.com/wow-look-at-my/docker-cleaner/internal/progress"
 	"github.com/wow-look-at-my/docker-cleaner/internal/run"
 	"golang.org/x/term"
 )
@@ -33,9 +37,36 @@ var opts struct {
 	rescan       bool
 	dockerBin    string
 	timeout      time.Duration
+	scanTimeout  time.Duration
 	indexPath    string
 	mountInfo    string
 	dockerRoot   string
+	progress     string
+}
+
+// progressModes are the accepted --progress values.
+var progressModes = []string{"auto", "always", "never"}
+
+// reporter builds the progress reporter for this invocation. It draws on
+// stderr, so stdout carries only the report and --json stays parseable.
+func reporter(mode string) (*progress.Reporter, error) {
+	fd := int(os.Stderr.Fd())
+	tty := term.IsTerminal(fd)
+	switch mode {
+	case "never":
+		return nil, nil
+	// Only a terminal gets the escape codes that redraw a line.
+	case "always", "auto":
+	default:
+		return nil, fmt.Errorf("--progress: %q is not %s", mode, strings.Join(progressModes, ", "))
+	}
+	width := 0
+	if tty {
+		if w, _, err := term.GetSize(fd); err == nil {
+			width = w
+		}
+	}
+	return progress.New(os.Stderr, tty, width), nil
 }
 
 var rootCmd = &cobra.Command{
@@ -66,13 +97,23 @@ retires a project.`,
 			return fmt.Errorf("--json needs --dry-run or --yes: a prompt would corrupt the output")
 		}
 
+		bar, err := reporter(opts.progress)
+		if err != nil {
+			return err
+		}
+
 		runner, err := newRunner(opts.dockerBin, opts.timeout)
 		if err != nil {
+			bar.Stop()
 			fmt.Fprintln(os.Stderr, "docker-cleaner:", err)
 			os.Exit(run.ExitEnvironment)
 		}
 
-		code := run.Do(context.Background(), run.Config{
+		// The interrupt reaches the docker child and the disk walk.
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer stop()
+
+		code := run.Do(ctx, run.Config{
 			Options: plan.Options{
 				Age:            age,
 				BuildCacheAge:  cacheAge,
@@ -91,13 +132,16 @@ retires a project.`,
 			IndexPath:   opts.indexPath,
 			MountInfo:   opts.mountInfo,
 			DockerRoot:  opts.dockerRoot,
+			ScanTimeout: opts.scanTimeout,
 			Runner:      runner,
 			Stdout:      cmd.OutOrStdout(),
 			Stderr:      cmd.ErrOrStderr(),
 			Stdin:       os.Stdin,
+			Progress:    bar,
 			Interactive: term.IsTerminal(int(os.Stdin.Fd())),
 			Now:         time.Now(),
 		})
+		bar.Stop()
 		os.Exit(code)
 		return nil
 	},
@@ -119,7 +163,11 @@ func init() {
 	f.BoolVar(&opts.showKept, "show-kept", false, "list every kept resource instead of counts")
 	f.BoolVar(&opts.rescan, "rescan", false, "walk the disk for compose files even if the index answers")
 	f.StringVar(&opts.dockerBin, "docker-bin", "docker", "docker executable to run")
-	f.DurationVar(&opts.timeout, "timeout", 2*time.Minute, "timeout for one docker invocation")
+	f.DurationVar(&opts.timeout, "timeout", 2*time.Minute, "timeout for a docker invocation")
+	f.DurationVar(&opts.scanTimeout, "scan-timeout", 5*time.Minute,
+		"give up searching the disk for compose files after this, keeping every project the search could not resolve (0 waits forever)")
+	f.StringVar(&opts.progress, "progress", "auto",
+		"show what the run is doing on stderr: "+strings.Join(progressModes, ", "))
 	f.StringVar(&opts.indexPath, "index", compose.DefaultIndexPath, "where the compose project index lives")
 	f.StringVar(&opts.mountInfo, "mountinfo", compose.DefaultMountInfo, "mount table naming the filesystems to search")
 	f.StringVar(&opts.dockerRoot, "docker-root", "/var/lib/docker", "docker's storage root, excluded from the search")

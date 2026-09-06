@@ -30,6 +30,63 @@ tests:
 			exec.log:
 				exists: true
 
+	- desc: a run says what it is doing while it does it, on stderr, leaving stdout to the report
+	  cmd: 'mkdir -p {outputs.empty}; B=$(cat {shared.bin}); FAKE_DOCKER_STATE={shared.state} $B --dry-run --docker-bin dats/fixtures/fake-docker --index {outputs.index.json} --mountinfo {inputs.mountinfo} --docker-root {outputs.dockerroot}'
+	  inputs:
+		files:
+			mountinfo: "27 1 259:2 / {outputs.empty} rw,relatime shared:1 - ext4 /dev/sda1 rw\n"
+	  outputs:
+		stderr:
+			- "docker-cleaner: asking docker for its version"
+			- "docker-cleaner: reading containers"
+			- "docker-cleaner: looking for compose projects"
+			- "docker-cleaner: deciding what to remove"
+		!stderr:
+			- "["
+		!stdout:
+			- "docker-cleaner: reading containers"
+
+	- desc: progress never says nothing at all
+	  cmd: 'mkdir -p {outputs.empty}; B=$(cat {shared.bin}); FAKE_DOCKER_STATE={shared.state} $B --dry-run --progress never --docker-bin dats/fixtures/fake-docker --index {outputs.index.json} --mountinfo {inputs.mountinfo} --docker-root {outputs.dockerroot}'
+	  inputs:
+		files:
+			mountinfo: "27 1 259:2 / {outputs.empty} rw,relatime shared:1 - ext4 /dev/sda1 rw\n"
+	  outputs:
+		stdout:
+			- "DRY RUN"
+		!stderr:
+			- "docker-cleaner: reading"
+
+	- desc: a --progress it does not know is a usage error, not a silent default
+	  cmd: 'B=$(cat {shared.bin}); FAKE_DOCKER_STATE={shared.state} $B --dry-run --progress loud --docker-bin dats/fixtures/fake-docker'
+	  exit: 2
+	  outputs:
+		stderr:
+			- "--progress"
+			- "auto, always, never"
+
+	- desc: a search that runs out of time keeps every project it could not resolve
+	  cmd: 'mkdir -p {outputs.proj}; B=$(cat {shared.bin}); FAKE_DOCKER_STATE=$(dirname {inputs.version.json}) $B --dry-run --scan-timeout 1ns --docker-bin dats/fixtures/fake-docker --index {outputs.index.json} --mountinfo {inputs.mountinfo} --docker-root {outputs.dockerroot} --show-kept'
+	  inputs:
+		files:
+			version.json: '{"Client":{"Version":"29.3.1"},"Server":{"Version":"29.3.1"}}'
+			system_df.txt: "TYPE   TOTAL   ACTIVE   SIZE   RECLAIMABLE\n"
+			system_df_v.json: '{"Volumes":[{"Name":"webapp_pgdata","UsageData":{"Size":52428800}}]}'
+			ps.txt: ""
+			image_ls.json: ""
+			network_ls.json: ""
+			buildx_ls.json: ""
+			volume_ls.json: '{"Name":"webapp_pgdata"}'
+			volume_inspect.json: '[{"Name":"webapp_pgdata","Driver":"local","Scope":"local","Labels":{"com.docker.compose.project":"webapp"}}]'
+			mountinfo: "27 1 259:2 / {outputs.proj} rw,relatime shared:1 - ext4 /dev/sda1 rw\n"
+	  outputs:
+		stdout:
+			- "SEARCH INCOMPLETE"
+			- "COULD NOT SEARCH"
+			- "the search was incomplete"
+		!stdout:
+			- "VOLUMES TO REMOVE"
+
 	- desc: an apply removes exactly what the plan listed
 	  cmd: 'mkdir -p {outputs.empty}; B=$(cat {shared.bin}); FAKE_DOCKER_STATE={shared.state} FAKE_DOCKER_LOG={outputs.exec.log} $B --yes --docker-bin dats/fixtures/fake-docker --index {outputs.index.json} --mountinfo {inputs.mountinfo} --docker-root {outputs.dockerroot}'
 	  inputs:

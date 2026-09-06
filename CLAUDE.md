@@ -15,6 +15,7 @@ One command that removes docker resources nothing will use again. Read the READM
 - `internal/compose/` -- would a project still on disk attach this? `index.go` remembers paths, `scan.go` searches for them, `project.go` renders a compose file, `discover.go` decides alive, deleted or unknown.
 - `internal/plan/` -- `Compute` is pure: snapshot plus options plus one clock reading gives the plan. Nothing else decides what goes.
 - `internal/report/` -- the terminal report (`text.go`) and the JSON document (`json.go`).
+- `internal/progress/` -- says what the run is doing, on stderr, while it does it. A nil `*Reporter` is a working no-op.
 - `internal/run/` -- read, discover, decide, show, confirm, apply, report.
 - `dats/cli.dats` -- end to end against `dats/fixtures/fake-docker`, a canned docker that logs every mutating call.
 
@@ -28,3 +29,6 @@ One command that removes docker resources nothing will use again. Read the READM
 - Zero `FinishedAt` parses to year one and beats every cutoff, so `dockercli.ParseTime` rejects it. See the trap list in the plan.
 - `buildx prune` acts on one builder, so every builder from `buildx ls` gets its own command. Its `until=` takes a Go duration: `168h`, never `7d`.
 - Protection is per image ID, not per tag: if one tag of an id is kept, no `rmi` is emitted for its other tags.
+- Progress goes to stderr, never stdout. A `--json` document stays parseable while the run narrates itself.
+- The compose search is bounded by `--scan-timeout` and by a depth limit, and it skips a directory it has already read, by device and inode. Each of those exits is a `Failure`, which marks the search incomplete and keeps every unresolved project.
+- A file the render never reached is `Unreadable`, never a project that declares nothing. The second reading retires a live project.

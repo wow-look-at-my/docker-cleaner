@@ -17,11 +17,11 @@ There is nothing to configure. Every read and every delete is a stock `docker` i
 - Volumes and custom networks nothing will attach, named and anonymous alike.
 - Build cache nothing has used in `--build-cache-age` (default `7d`) — on every builder, not just the configured one.
 
-Removing a stale container frees its image, volume and network in the same run; each of those lines says which container freed it.
+Removing a stale container frees its image, volume and network in the same run. Each of those lines says which container freed it.
 
 ## What it never removes
 
-Bind mounts (docker cannot), anything a surviving container holds, the newest image of any repository, and anything a compose project still on disk would attach. Nothing else is exempt.
+Bind mounts (docker cannot), anything a surviving container holds, and the newest image of any repository. It also keeps anything a compose project still on disk attaches on its next `up`. Nothing else is exempt.
 
 ## A stack that is down is not a stack that is deleted
 
@@ -30,6 +30,12 @@ Bind mounts (docker cannot), anything a surviving container holds, the newest im
 Finding those files is fast because the tool remembers them: every container names its project's compose files in a label, and that goes into an index at `/var/lib/docker-cleaner/projects.json`. An ordinary run is index lookups and `stat` calls. Only a project the index has never heard of costs a filesystem search, and the results go into the index, so it happens once per project rather than once per run.
 
 If the search cannot run everywhere — an unreadable directory, a denied mount — the run says so and keeps every unresolved project's resources. Not looking is never evidence of deletion. Run it as root for a complete search.
+
+## While it works
+
+A run reports each step on stderr. It names the docker read it waits on. It counts the directories the search walks and the compose files it reads. On a terminal it redraws a line in place. Anywhere else it prints a line per change, so a log keeps every step. `--progress never` turns it off. Only the report goes to stdout, so `--json` stays parseable either way.
+
+The search gives up after `--scan-timeout` (default `5m`). Before this it waited forever on a wedged network mount, or on a directory that leads back into itself. To give up is safe: the run then reports the search as incomplete, which keeps every project it cannot resolve. `Ctrl-C` stops a run at once.
 
 ### Optional: `docker-cleaner watch`
 
@@ -67,7 +73,7 @@ docker-cleaner --dry-run --json | jq '.'      # the literal argv of every comman
 docker-cleaner --dry-run --keep 'base/*'      # pin images by glob
 ```
 
-Exit codes: `0` done (or a dry run, or a declined prompt), `1` some removals were rejected, `2` bad usage, `3` docker could not be read so no plan was trusted.
+Exit codes: `0` done (or a dry run, or a declined prompt), `1` some removals were rejected, `2` bad usage, `3` docker cannot be read, so no plan was trusted.
 
 Every flag is listed in [docs/cmdline_args.txt](docs/cmdline_args.txt), generated from the tool's own help.
 

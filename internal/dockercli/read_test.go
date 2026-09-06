@@ -15,7 +15,7 @@ import (
 func TestReadParsesEveryDocument(t *testing.T) {
 	f := newFake(t)
 
-	s, err := Read(context.Background(), f)
+	s, err := Read(context.Background(), f, nil)
 	require.NoError(t, err)
 
 	require.NotNil(t, s.Version.Server)
@@ -45,7 +45,7 @@ func TestReadParsesEveryDocument(t *testing.T) {
 func TestBindMountIsReadAsABind(t *testing.T) {
 	f := newFake(t)
 
-	s, err := Read(context.Background(), f)
+	s, err := Read(context.Background(), f, nil)
 	require.NoError(t, err)
 
 	require.Len(t, s.Containers[0].Mounts, 2)
@@ -59,7 +59,7 @@ func TestBindMountIsReadAsABind(t *testing.T) {
 func TestDuplicateImageRowsAreInspectedOnce(t *testing.T) {
 	f := newFake(t)
 
-	_, err := Read(context.Background(), f)
+	_, err := Read(context.Background(), f, nil)
 	require.NoError(t, err)
 
 	calls := f.callsWithPrefix("image inspect")
@@ -72,7 +72,7 @@ func TestDuplicateImageRowsAreInspectedOnce(t *testing.T) {
 func TestEveryBuilderIsRead(t *testing.T) {
 	f := newFake(t)
 
-	s, err := Read(context.Background(), f)
+	s, err := Read(context.Background(), f, nil)
 	require.NoError(t, err)
 
 	require.Len(t, s.Caches, 2)
@@ -92,7 +92,7 @@ func TestBuildxMissingFallsBackToSystemDF(t *testing.T) {
 		return nil, []byte("docker: 'buildx' is not a docker command"), errors.New("exit status 125")
 	}
 
-	s, err := Read(context.Background(), f)
+	s, err := Read(context.Background(), f, nil)
 	require.NoError(t, err)
 
 	require.Len(t, s.Caches, 1)
@@ -107,7 +107,7 @@ func TestUnreadableCacheIsReportedNotFatal(t *testing.T) {
 		return nil, []byte("failed to connect to builder"), errors.New("exit status 1")
 	}
 
-	s, err := Read(context.Background(), f)
+	s, err := Read(context.Background(), f, nil)
 	require.NoError(t, err)
 
 	assert.Empty(t, s.Caches)
@@ -120,7 +120,7 @@ func TestUnreachableDaemonIsFatal(t *testing.T) {
 		return fixture(t, "version_no_daemon.json"), nil, nil
 	}
 
-	_, err := Read(context.Background(), f)
+	_, err := Read(context.Background(), f, nil)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "daemon is not reachable")
@@ -134,7 +134,7 @@ func TestFailedReadIsFatal(t *testing.T) {
 			return nil, []byte("Cannot connect to the Docker daemon"), errors.New("exit status 1")
 		}
 
-		_, err := Read(context.Background(), f)
+		_, err := Read(context.Background(), f, nil)
 
 		require.Error(t, err, prefix)
 	}
@@ -146,7 +146,7 @@ func TestUnparseableOutputIsFatal(t *testing.T) {
 		return []byte("{not json"), nil, nil
 	}
 
-	_, err := Read(context.Background(), f)
+	_, err := Read(context.Background(), f, nil)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "parsing output")
@@ -161,7 +161,7 @@ func TestMissingObjectIsNotFatal(t *testing.T) {
 			[]byte("Error: No such container: c0ffee9"), errors.New("exit status 1")
 	}
 
-	s, err := Read(context.Background(), f)
+	s, err := Read(context.Background(), f, nil)
 
 	require.NoError(t, err)
 	assert.Len(t, s.Containers, 2)
@@ -173,7 +173,7 @@ func TestOtherInspectErrorsAreFatal(t *testing.T) {
 		return nil, []byte("permission denied while trying to connect"), errors.New("exit status 1")
 	}
 
-	_, err := Read(context.Background(), f)
+	_, err := Read(context.Background(), f, nil)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "permission denied")
@@ -194,7 +194,7 @@ func TestInspectBatchesWithoutLosingIDs(t *testing.T) {
 	}
 	r := &recorder{}
 
-	_, err := inspect[Container](context.Background(), r, "container", ids)
+	_, err := inspect[Container](context.Background(), r, "container", ids, nil)
 	require.NoError(t, err)
 
 	require.Len(t, r.calls, 3)
@@ -211,7 +211,7 @@ func TestInspectBatchesWithoutLosingIDs(t *testing.T) {
 func TestEmptyListIssuesNoInspect(t *testing.T) {
 	r := &recorder{}
 
-	out, err := inspect[Container](context.Background(), r, "container", nil)
+	out, err := inspect[Container](context.Background(), r, "container", nil, nil)
 
 	require.NoError(t, err)
 	assert.Empty(t, out)
@@ -249,8 +249,14 @@ func TestParseTimeRejectsTheZeroValue(t *testing.T) {
 }
 
 // Every fixture must be named by some test. A fixture nothing reads looks like
-// coverage and proves nothing.
+// coverage and proves nothing. This test drives the reads itself rather than
+// trusting its neighbours to have run already, because the runner is free to
+// execute a test on its own.
 func TestEveryFixtureIsUsed(t *testing.T) {
+	_, err := Read(context.Background(), newFake(t), nil)
+	require.NoError(t, err)
+	fixture(t, "version_no_daemon.json")
+
 	entries, err := os.ReadDir("testdata")
 	require.NoError(t, err)
 

@@ -31,9 +31,11 @@ Flags:
       --no-images                leave images alone
       --no-networks              leave networks alone
       --no-volumes               leave volumes alone
+      --progress string          show what the run is doing on stderr: auto, always, never (default "auto")
       --rescan                   walk the disk for compose files even if the index answers
+      --scan-timeout duration    give up searching the disk for compose files after this, keeping every project the search could not resolve (0 waits forever) (default 5m0s)
       --show-kept                list every kept resource instead of counts
-      --timeout duration         timeout for one docker invocation (default 2m0s)
+      --timeout duration         timeout for a docker invocation (default 2m0s)
   -v, --version                  version for docker-cleaner
   -y, --yes                      apply without confirming
 

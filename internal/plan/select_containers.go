@@ -84,8 +84,7 @@ func aliveState(status string) (Reason, bool) {
 }
 
 // containerAge picks the timestamp meaning "offline since". A container that
-// never ran leaves FinishedAt unset, which parses to a year before every
-// cutoff and so
+// never ran leaves FinishedAt unset, which beats every cutoff and so
 // beats every cutoff; comparing it naively deletes containers made a minute
 // ago. A created container ages by creation, and any other state without a
 // usable FinishedAt is kept.

@@ -28,7 +28,8 @@ const webappProject = `{
 // liveProject is discovery on a machine whose webapp compose file is present.
 func liveProject(t *testing.T) *compose.Discovery {
 	t.Helper()
-	claims := compose.Resolve(context.Background(), composeRunner{webappProject}, []string{"/srv/webapp/compose.yaml"})
+	claims := compose.Resolve(context.Background(), composeRunner{webappProject},
+		[]string{"/srv/webapp/compose.yaml"}, nil)
 	return &compose.Discovery{Claims: claims, Complete: true}
 }
 

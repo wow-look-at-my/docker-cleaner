@@ -3,11 +3,15 @@ package compose
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
+	"sync/atomic"
 
 	"github.com/wow-look-at-my/docker-cleaner/internal/dockercli"
+	"github.com/wow-look-at-my/docker-cleaner/internal/progress"
 )
 
 // config is the part of `docker compose config --format json` needed here.
@@ -47,10 +51,17 @@ type Claims struct {
 	networks map[string]string
 }
 
+// renderWorkers bounds the `docker compose config` processes a render forks.
+const renderWorkers = 8
+
 // Resolve renders every compose file into its claims. Files that name the same
 // project are merged, because a directory holding both compose.yaml and
 // docker-compose.yml is the same project described by both files.
-func Resolve(ctx context.Context, r dockercli.Runner, files []string) *Claims {
+//
+// Files render together, and the results are merged in file order, so the
+// claims never depend on the order the renders finished in. A cancelled context
+// leaves the rest unread, which the caller reports as an incomplete search.
+func Resolve(ctx context.Context, r dockercli.Runner, files []string, p *progress.Reporter) *Claims {
 	c := &Claims{
 		Projects:   map[string]*Project{},
 		Unreadable: map[string]string{},
@@ -59,13 +70,12 @@ func Resolve(ctx context.Context, r dockercli.Runner, files []string) *Claims {
 		networks:   map[string]string{},
 	}
 
-	for _, file := range files {
-		cfg, err := render(ctx, r, file)
-		if err != nil {
-			c.Unreadable[file] = err.Error()
+	for i, rendered := range renderAll(ctx, r, files, p) {
+		if rendered.err != nil {
+			c.Unreadable[files[i]] = rendered.err.Error()
 			continue
 		}
-		c.add(file, cfg)
+		c.add(files[i], rendered.cfg)
 	}
 
 	for _, p := range c.Projects {
@@ -75,6 +85,56 @@ func Resolve(ctx context.Context, r dockercli.Runner, files []string) *Claims {
 		sort.Strings(p.Networks)
 	}
 	return c
+}
+
+// rendered is what a file's `docker compose config` produced.
+type rendered struct {
+	cfg config
+	err error
+}
+
+// renderAll renders the files together and returns a result per file, in the
+// order the files were given. A file nothing reached carries an error, so a
+// search cut short can never read as "this project declares nothing".
+func renderAll(ctx context.Context, r dockercli.Runner, files []string, p *progress.Reporter) []rendered {
+	out := make([]rendered, len(files))
+	if len(files) == 0 {
+		return out
+	}
+	for i := range out {
+		out[i].err = errors.New("the run stopped before this file was read")
+	}
+
+	var done atomic.Int64
+	p.Detail(func() string {
+		return fmt.Sprintf("(%d of %d)", done.Load(), len(files))
+	})
+	defer p.Detail(nil)
+
+	work := make(chan int)
+	var wg sync.WaitGroup
+	for range min(renderWorkers, len(files)) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := range work {
+				out[i].cfg, out[i].err = render(ctx, r, files[i])
+				done.Add(1)
+			}
+		}()
+	}
+	for i := range files {
+		select {
+		case work <- i:
+		case <-ctx.Done():
+			close(work)
+			wg.Wait()
+			return out
+		}
+	}
+	close(work)
+	wg.Wait()
+	return out
 }
 
 func render(ctx context.Context, r dockercli.Runner, file string) (config, error) {

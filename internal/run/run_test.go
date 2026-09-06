@@ -21,9 +21,8 @@ var now = time.Date(2026, 8, 28, 12, 0, 0, 0, time.UTC)
 
 func ago(d time.Duration) string { return now.Add(-d).Format(time.RFC3339Nano) }
 
-// inspectDoc renders what `docker inspect` prints. Marshalling beats
-// pasting the text together: a path or a name carrying a quote would otherwise
-// produce a document the reader cannot parse.
+// inspectDoc renders what `docker inspect` prints. A name carrying a quote
+// breaks a document pasted together, so this marshals it.
 func inspectDoc(objects ...map[string]any) string {
 	body, err := json.Marshal(objects)
 	if err != nil {

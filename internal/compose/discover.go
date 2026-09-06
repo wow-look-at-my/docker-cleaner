@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/wow-look-at-my/docker-cleaner/internal/dockercli"
+	"github.com/wow-look-at-my/docker-cleaner/internal/progress"
 )
 
 // Label keys compose writes. Only container labels name files on disk, which
@@ -35,8 +36,9 @@ type Options struct {
 	Index   *Index
 	Scanner Scanner
 	// Rescan walks the disk even when the index already answers everything.
-	Rescan bool
-	Now    time.Time
+	Rescan   bool
+	Now      time.Time
+	Progress *progress.Reporter
 }
 
 // Discover resolves every compose project that could own a docker resource.
@@ -68,7 +70,8 @@ func Discover(ctx context.Context, r dockercli.Runner, containers []dockercli.Co
 	}
 
 	if (unresolved || o.Rescan) && o.Scanner != nil {
-		res, err := o.Scanner.Scan()
+		o.Progress.Stage("searching the disk for compose files")
+		res, err := o.Scanner.Scan(ctx)
 		if err != nil {
 			d.Complete = false
 			d.Failures = append(d.Failures, err.Error())
@@ -84,9 +87,21 @@ func Discover(ctx context.Context, r dockercli.Runner, containers []dockercli.Co
 		}
 	}
 
-	d.Claims = Resolve(ctx, r, sortedKeys(files))
+	found := sortedKeys(files)
+	if len(found) > 0 {
+		o.Progress.Stage("reading compose files")
+	}
+	d.Claims = Resolve(ctx, r, found, o.Progress)
 	for project, p := range d.Claims.Projects {
 		idx.Record(project, p.Files, o.Now)
+	}
+
+	// A search cut short reached neither every directory nor every file, so
+	// "no compose file names this project" stops being evidence of deletion.
+	// The walk reports its own end, so this covers the render.
+	if ctx.Err() != nil && d.Complete {
+		d.Complete = false
+		d.Failures = append(d.Failures, "the compose search ran out of time before every file was read")
 	}
 	// Drop a project whose files all vanished, so the index tracks the disk.
 	for _, project := range wanted {
