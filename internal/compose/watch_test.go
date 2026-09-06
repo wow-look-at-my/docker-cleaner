@@ -22,7 +22,7 @@ func TestEventYieldsProjectAndFiles(t *testing.T) {
 	assert.Equal(t, []string{"/srv/webapp/compose.yaml", "/srv/webapp/override.yaml"}, files)
 }
 
-// A one-off `compose run` container carries the same labels, and its paths are
+// A throwaway `compose run` container carries the same labels, and its paths are
 // just as true as any other container's.
 func TestOneOffEventIsStillASource(t *testing.T) {
 	line := `{"Type":"container","Action":"create","Actor":{"Attributes":{` +

@@ -112,7 +112,7 @@ func TestUnwritableIndexWarnsInsteadOfFailing(t *testing.T) {
 }
 
 // A watcher and a manual run write the same file. The rename is atomic, so a
-// reader sees one whole index rather than a truncated one.
+// reader sees a whole index rather than a truncated file.
 func TestConcurrentSavesLeaveAReadableIndex(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "projects.json")
 	file := filepath.Join(t.TempDir(), "compose.yaml")

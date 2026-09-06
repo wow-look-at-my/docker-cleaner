@@ -19,7 +19,7 @@ type refs struct {
 	removing map[string]bool
 }
 
-// buildRefs walks every container once. Networks come from the containers
+// buildRefs walks each container. Networks come from the containers
 // themselves as well as from `network inspect`, because inspect lists live
 // endpoints only: a stopped container's membership appears nowhere else, and
 // missing it deletes the network a stopped stack needs to start again.
@@ -63,7 +63,7 @@ func buildRefs(containers []dockercli.Container, networks []dockercli.Network, r
 	return r
 }
 
-// state is what the reference graph concludes about one resource.
+// state is what the reference graph concludes about a resource.
 type state struct {
 	// held: a container surviving this run still references the resource.
 	held bool

@@ -40,7 +40,7 @@ func TestReadParsesEveryDocument(t *testing.T) {
 	assert.Equal(t, "webapp_default", s.Networks[0].Name)
 }
 
-// A volume mounted from the host is a bind, and no docker command deletes one.
+// A volume mounted from the host is a bind, and no docker command deletes it.
 // It must survive the read as a bind so nothing downstream can select it.
 func TestBindMountIsReadAsABind(t *testing.T) {
 	f := newFake(t)
@@ -54,8 +54,8 @@ func TestBindMountIsReadAsABind(t *testing.T) {
 	assert.Empty(t, s.Containers[0].Mounts[1].Name)
 }
 
-// image ls repeats an id once per tag. Inspecting a duplicate would count the
-// same image twice.
+// image ls repeats an id per tag. Inspecting a duplicate would count the same
+// image again.
 func TestDuplicateImageRowsAreInspectedOnce(t *testing.T) {
 	f := newFake(t)
 
@@ -67,8 +67,8 @@ func TestDuplicateImageRowsAreInspectedOnce(t *testing.T) {
 	assert.Equal(t, []string{"image", "inspect", "sha256:aaa1", "sha256:bbb2"}, calls[0])
 }
 
-// buildx du and buildx prune both act on one builder, so a read that asks once
-// reports only the configured builder's cache.
+// buildx du and buildx prune both act on a builder, so a read that asks about
+// the configured builder reports only that builder's cache.
 func TestEveryBuilderIsRead(t *testing.T) {
 	f := newFake(t)
 
@@ -100,7 +100,7 @@ func TestBuildxMissingFallsBackToSystemDF(t *testing.T) {
 	assert.Equal(t, "df1", s.Caches[0].Records[0].ID)
 }
 
-// Build cache is one step of many. Losing it is reported, never fatal.
+// Build cache is a step of many. Losing it is reported, never fatal.
 func TestUnreadableCacheIsReportedNotFatal(t *testing.T) {
 	f := newFake(t)
 	f.override["buildx du"] = func() ([]byte, []byte, error) {
@@ -186,7 +186,7 @@ func (r *recorder) Run(_ context.Context, args ...string) ([]byte, []byte, error
 	return nil, nil, nil
 }
 
-// A host with thousands of objects would blow past ARG_MAX in one call.
+// A host with thousands of objects would blow past ARG_MAX in a call.
 func TestInspectBatchesWithoutLosingIDs(t *testing.T) {
 	var ids []string
 	for i := range 250 {
@@ -218,7 +218,7 @@ func TestEmptyListIssuesNoInspect(t *testing.T) {
 	assert.Empty(t, r.calls)
 }
 
-// Some docker versions wrap a listing in one array instead of a line per row.
+// Some docker versions wrap a listing in an array instead of a line per row.
 func TestBothListingShapesDecode(t *testing.T) {
 	type row struct {
 		ID string `json:"ID"`
@@ -248,7 +248,7 @@ func TestParseTimeRejectsTheZeroValue(t *testing.T) {
 	assert.Equal(t, 2026, got.Year())
 }
 
-// Every fixture must be named by some test. One that nothing reads looks like
+// Every fixture must be named by some test. A fixture nothing reads looks like
 // coverage and proves nothing.
 func TestEveryFixtureIsUsed(t *testing.T) {
 	entries, err := os.ReadDir("testdata")

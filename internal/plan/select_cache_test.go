@@ -57,7 +57,7 @@ func TestCacheInUseIsNeverPruned(t *testing.T) {
 	assert.Equal(t, ReasonCacheInUse, reason)
 }
 
-// buildx prunes one builder at a time, so every builder needs its own command.
+// buildx prunes a builder at a time, so every builder needs its own command.
 // A plain prune would silently leave every non-default builder untouched.
 func TestEveryBuilderGetsItsOwnPrune(t *testing.T) {
 	stale := []dockercli.CacheRecord{{ID: "s", Size: 10, CreatedAt: ago(30 * 24 * time.Hour)}}

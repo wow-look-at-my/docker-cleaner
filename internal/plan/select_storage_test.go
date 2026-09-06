@@ -63,7 +63,7 @@ func TestNonLocalVolumesAreLeftAlone(t *testing.T) {
 }
 
 // A buildx state volume still goes, but it is labelled: it holds that
-// builder's whole cache rather than one ageing slice of it.
+// builder's whole cache rather than an ageing slice of it.
 func TestBuildxStateVolumeIsSelectedWithANote(t *testing.T) {
 	snap := dockercli.Snapshot{Volumes: []dockercli.Volume{localVolume("buildx_buildkit_default0_state")}}
 

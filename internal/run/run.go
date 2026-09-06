@@ -16,7 +16,7 @@ import (
 	"github.com/wow-look-at-my/docker-cleaner/internal/report"
 )
 
-// Config is one invocation.
+// Config describes an invocation.
 type Config struct {
 	Options    plan.Options
 	DryRun     bool
@@ -37,7 +37,7 @@ type Config struct {
 	Now         time.Time
 }
 
-// Do performs one run and returns the process exit code.
+// Do performs a run and returns the process exit code.
 func Do(ctx context.Context, c Config) int {
 	snap, err := dockercli.Read(ctx, c.Runner)
 	if err != nil {
@@ -186,7 +186,8 @@ func blockedBy(t plan.Target, notRemoved map[string]bool) (bool, string) {
 	return true, strings.Join(t.FreedBy, ", ")
 }
 
-// emitJSON prints one document. With --yes it applies first and records what
+// emitJSON prints a document. With --yes it applies before printing, and
+// records what
 // actually ran, so the operations array is history rather than intent; the
 // apply log goes to stderr to keep stdout parseable.
 func emitJSON(ctx context.Context, c Config, p plan.Plan) int {

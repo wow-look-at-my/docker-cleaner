@@ -3,6 +3,7 @@ package report
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,7 +18,7 @@ import (
 
 var now = time.Date(2026, 8, 28, 12, 0, 0, 0, time.UTC)
 
-// fixedPlan is one plan covering every section the report can print.
+// fixedPlan is a plan covering every section the report can print.
 func fixedPlan() plan.Plan {
 	return plan.Plan{
 		Now:           now,
@@ -120,7 +121,7 @@ func TestIncompleteSearchIsAnnouncedAndItsFailuresListed(t *testing.T) {
 	assert.Contains(t, out, "12043 directories walked")
 }
 
-// The exact prune argv is printed because it is the one command whose effect
+// The exact prune argv is printed because it is the command whose effect
 // cannot be undone by re-running the tool.
 func TestBuildCachePrintsTheCommandItWillRun(t *testing.T) {
 	out := string(render(t, fixedPlan(), "", true, false))
@@ -168,7 +169,7 @@ func TestJSONEmptyPlanHasEmptyArraysNotNulls(t *testing.T) {
 
 	body := buf.String()
 	for _, key := range []string{"containers", "images", "volumes", "networks", "build_cache", "kept"} {
-		assert.Contains(t, body, "\""+key+"\": []")
+		assert.Contains(t, body, fmt.Sprintf("%q: []", key))
 	}
 	assert.NotContains(t, body, "null")
 }

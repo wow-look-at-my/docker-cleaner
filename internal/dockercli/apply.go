@@ -5,19 +5,19 @@ import (
 	"strings"
 )
 
-// RemoveContainer removes one container. Never -f (kills running) or -v.
+// RemoveContainer removes a container. Never -f (kills running) or -v.
 func RemoveContainer(id string) []string { return []string{"rm", id} }
 
-// RemoveImageRef removes one reference; an id with several tags needs each.
+// RemoveImageRef removes a reference; an id with several tags needs each.
 func RemoveImageRef(ref string) []string { return []string{"rmi", ref} }
 
-// RemoveVolume removes one volume, one call each so failures stay visible.
+// RemoveVolume removes a volume, a call each so failures stay visible.
 func RemoveVolume(name string) []string { return []string{"volume", "rm", name} }
 
-// RemoveNetwork removes one network.
+// RemoveNetwork removes a network.
 func RemoveNetwork(id string) []string { return []string{"network", "rm", id} }
 
-// PruneBuildCache prunes one builder. Here until= means "not used in", the
+// PruneBuildCache prunes a builder. Here until= means "not used in", the
 // only ageing docker offers that tracks whether a thing is still wanted. It
 // takes a Go duration: 168h, never 7d.
 func PruneBuildCache(builder, until string) []string {
@@ -28,7 +28,8 @@ func PruneBuildCache(builder, until string) []string {
 	return append(args, "--force", "--filter", "until="+until)
 }
 
-// Do runs one mutating command, reporting docker's first stderr line.
+// Do runs a mutating command, reporting the leading stderr line docker
+// printed.
 func Do(ctx context.Context, r Runner, args []string) error {
 	_, errb, err := r.Run(ctx, args...)
 	if err == nil {

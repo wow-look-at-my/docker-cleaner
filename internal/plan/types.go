@@ -1,7 +1,7 @@
 // Package plan decides what to remove. Compute is pure: it takes a snapshot,
 // the options and a single clock reading, and returns the plan. Everything the
 // dry run prints and everything the apply phase executes comes from here, so
-// the two can never disagree.
+// they can never disagree.
 package plan
 
 import "time"
@@ -18,7 +18,7 @@ const (
 	KindBuildCache Kind = "build cache"
 )
 
-// Reason says why a resource was kept. Every non-target carries one.
+// Reason says why a resource was kept. Every non-target carries a reason.
 type Reason string
 
 // Why a container was kept.
@@ -66,13 +66,13 @@ const (
 // Why anything was kept.
 const ReasonStepDisabled Reason = "that step is turned off"
 
-// Target is one resource this run will remove.
+// Target is a resource this run will remove.
 type Target struct {
 	Kind   Kind
 	ID     string
 	Name   string
 	Detail string
-	// Note flags a target worth a second look. It never changes the verdict.
+	// Note flags a target worth another look. It never changes the verdict.
 	Note string
 	Size int64
 	// FreedBy names the containers whose removal made this collectible.
@@ -81,7 +81,7 @@ type Target struct {
 	Commands [][]string
 }
 
-// Kept is one resource this run deliberately left alone.
+// Kept is a resource this run deliberately left alone.
 type Kept struct {
 	Kind   Kind
 	Name   string
@@ -89,7 +89,7 @@ type Kept struct {
 	Detail string
 }
 
-// CachePlan is the build cache step for one builder.
+// CachePlan is the build cache step for a builder.
 type CachePlan struct {
 	Builder string
 	Records int

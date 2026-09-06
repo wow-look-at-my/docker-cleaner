@@ -10,7 +10,7 @@ import (
 // DefaultMountInfo is the kernel's view of what is mounted.
 const DefaultMountInfo = "/proc/self/mountinfo"
 
-// Mount is one filesystem the scan may walk.
+// Mount is a filesystem the scan may walk.
 type Mount struct {
 	Point  string
 	FSType string
@@ -69,7 +69,7 @@ func parseMounts(text, dockerRoot string) []Mount {
 	return mounts
 }
 
-// parseMountLine reads one mountinfo record. The optional fields between the
+// parseMountLine reads a mountinfo record. The optional fields between the
 // root field and the separator are variable in number, so the separator is
 // what the format is anchored on.
 func parseMountLine(line string) (Mount, bool) {
@@ -91,7 +91,7 @@ func parseMountLine(line string) (Mount, bool) {
 	}, true
 }
 
-// unescapeOctal decodes the \040-style escapes mountinfo uses for spaces,
+// unescapeOctal decodes the octal escapes mountinfo uses for spaces,
 // tabs, newlines and backslashes in paths.
 func unescapeOctal(s string) string {
 	if !strings.Contains(s, `\`) {

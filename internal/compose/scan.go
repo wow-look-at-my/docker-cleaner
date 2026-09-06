@@ -85,7 +85,7 @@ func (s *FSScanner) Scan() (ScanResult, error) {
 	return result, nil
 }
 
-// walk descends one mount without crossing into another and without following
+// walk descends a mount without crossing into another and without following
 // symlinks, which would otherwise revisit whole trees.
 func walk(root string) (files, failures []string, dirs int) {
 	rootDev, ok := deviceOf(root)
@@ -109,7 +109,7 @@ func walk(root string) (files, failures []string, dirs int) {
 			full := filepath.Join(dir, name)
 			switch {
 			case e.Type()&fs.ModeSymlink != 0:
-				// A symlink is either a second route to something already
+				// A symlink is either another route to something already
 				// walked or a route off this filesystem. Neither is wanted.
 			case e.IsDir():
 				if name == ".git" {

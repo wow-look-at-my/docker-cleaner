@@ -6,7 +6,7 @@ import (
 )
 
 // SplitReference splits at the last colon, but only when the tail holds no
-// slash: else localhost:5000/myapp becomes repository "localhost".
+// slash: else a registry host carrying a port reads as the repository.
 func SplitReference(ref string) (repo, version string) {
 	i := strings.LastIndexByte(ref, ':')
 	if i < 0 {
@@ -18,7 +18,8 @@ func SplitReference(ref string) (repo, version string) {
 	return ref[:i], ref[i+1:]
 }
 
-// IsAnonymousVolume reports a docker-generated name: 64 hex characters.
+// IsAnonymousVolume reports a docker-generated name: hex characters, as
+// many as a sha256 digest spells.
 func IsAnonymousVolume(name string) bool {
 	if len(name) != 64 {
 		return false
@@ -32,7 +33,7 @@ func IsAnonymousVolume(name string) bool {
 	return true
 }
 
-// MatchKeep reports the first --keep glob matching a name. * crosses /, so
+// MatchKeep reports the earliest --keep glob matching a name. * crosses /, so
 // registry.local/* covers a whole registry.
 func MatchKeep(patterns, names []string) string {
 	for _, p := range patterns {

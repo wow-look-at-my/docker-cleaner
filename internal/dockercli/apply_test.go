@@ -31,7 +31,7 @@ func TestPruneBuildCacheArgv(t *testing.T) {
 
 // -f on rmi deletes an image a container still holds; -f on rm kills a running
 // container; -v on rm deletes the volume the plan promised to keep. The prune
-// is the one place --force is right, and it means "do not ask".
+// is the place --force is right, and it means "do not ask".
 func TestNoForcingFlagsOutsideThePrune(t *testing.T) {
 	commands := [][]string{
 		RemoveContainer("c1"),

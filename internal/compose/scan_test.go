@@ -38,8 +38,8 @@ func TestWalkFindsEverySpellingAtEveryDepth(t *testing.T) {
 	assert.Positive(t, res.Dirs)
 }
 
-// A symlink is either a second route to something already walked or a route
-// off this filesystem, so following one only costs time.
+// A symlink is either another route to something already walked or a route
+// off this filesystem, so following it only costs time.
 func TestWalkDoesNotFollowSymlinks(t *testing.T) {
 	root := t.TempDir()
 	real := t.TempDir()

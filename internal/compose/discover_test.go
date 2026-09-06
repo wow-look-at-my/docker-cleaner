@@ -2,6 +2,7 @@ package compose
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -31,7 +32,7 @@ func (s *stubScanner) Scan() (ScanResult, error) {
 	return s.res, s.err
 }
 
-// configRunner answers `docker compose config` with one project per file.
+// configRunner answers `docker compose config` with a project per file.
 type configRunner struct {
 	byFile map[string]string
 	fail   map[string]string
@@ -51,9 +52,20 @@ func (r *configRunner) Run(_ context.Context, args ...string) ([]byte, []byte, e
 	return []byte(body), nil, nil
 }
 
+// project renders what `docker compose config` prints for the named project.
+// Marshalling beats pasting the text together: a name carrying a quote would
+// otherwise produce a document the reader cannot parse.
 func project(name string) string {
-	return `{"name":"` + name + `","services":{"db":{"image":"postgres:16"}},` +
-		`"volumes":{"data":{}},"networks":{"default":{}}}`
+	body, err := json.Marshal(map[string]any{
+		"name":     name,
+		"services": map[string]any{"db": map[string]any{"image": "postgres:16"}},
+		"volumes":  map[string]any{"data": map[string]any{}},
+		"networks": map[string]any{"default": map[string]any{}},
+	})
+	if err != nil {
+		panic(err)
+	}
+	return string(body)
 }
 
 func labelled(project, files string) dockercli.Container {

@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-// fixture reads one captured docker response.
+// fixture reads a captured docker response.
 func fixture(t *testing.T, name string) []byte {
 	t.Helper()
 	b, err := os.ReadFile(filepath.Join("testdata", name))

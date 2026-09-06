@@ -112,7 +112,7 @@ func readNetworks(ctx context.Context, r Runner) ([]Network, error) {
 // readCaches enumerates every builder, because `docker buildx du` and `docker
 // buildx prune` both act on a single builder and a docker-container builder
 // keeps its cache in its own volume. A failure here is reported, not fatal:
-// build cache is one step, and losing it must not block the rest of the run.
+// build cache is a step of the read, and losing it must not block the rest of the run.
 func readCaches(ctx context.Context, r Runner, du DiskUsage) ([]Cache, string) {
 	builders, err := runNDJSON[Builder](ctx, r, "buildx", "ls", "--format", "json")
 	if err != nil || len(builders) == 0 {

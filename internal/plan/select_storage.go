@@ -15,7 +15,7 @@ var predefinedNetworks = set.Of[string]("bridge", "host", "none")
 // selectVolumes picks volumes nothing will attach.
 //
 // "Nothing will attach" is the whole difficulty: a stack that is merely `down`
-// has no containers either, and docker keeps no record telling the two apart.
+// has no containers either, and docker keeps no record telling them apart.
 // So a volume a compose file on disk still declares is in use, whatever the
 // container list says.
 func (b *builder) selectVolumes() {
@@ -68,7 +68,7 @@ func (b *builder) selectVolumes() {
 
 // selectNetworks picks custom networks nothing attaches. Compose recreates a
 // network on the next `up`, so this is the cheapest thing here to get wrong,
-// but a stopped container still belonging to one is a real reference.
+// but a stopped container still belonging to a project is a real reference.
 func (b *builder) selectNetworks() {
 	networks := append([]dockercli.Network(nil), b.snap.Networks...)
 	sort.Slice(networks, func(i, j int) bool { return networks[i].Name < networks[j].Name })
@@ -125,7 +125,7 @@ func (b *builder) selectNetworks() {
 
 // selectCache ages build cache by last use, which is the only measure docker
 // offers that says whether a thing is still wanted. Every builder is pruned:
-// buildx acts on one builder at a time, and a docker-container builder holds
+// buildx acts on a builder at a time, and a docker-container builder holds
 // its cache in a volume a plain prune never reaches.
 func (b *builder) selectCache() {
 	if b.snap.CacheUnavailable != "" {
@@ -200,7 +200,7 @@ func volumeDetail(v dockercli.Volume) string {
 }
 
 // volumeNote flags a buildx builder's state volume: removing it discards that
-// builder's whole cache at once instead of ageing it out.
+// builder's whole cache immediately instead of ageing it out.
 func volumeNote(v dockercli.Volume) string {
 	if strings.HasPrefix(v.Name, "buildx_buildkit_") {
 		return "buildx builder state: this is that builder's entire cache"

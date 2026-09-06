@@ -54,8 +54,9 @@ func TestTheResolvedProjectNameWins(t *testing.T) {
 	assert.Equal(t, []string{"chosen_data"}, c.Projects["chosen"].Volumes)
 }
 
-// A directory holding both compose.yaml and docker-compose.yml is one project
-// described twice. Letting the last file win would drop the other's volumes.
+// A directory holding compose.yaml and docker-compose.yml together is the same
+// project described by both files. Letting the last file win would drop the
+// other's volumes.
 func TestTwoFilesForOneProjectUnionTheirClaims(t *testing.T) {
 	r := &configRunner{byFile: map[string]string{
 		"/srv/app/compose.yaml": `{"name":"webapp","services":{"a":{"image":"nginx:1.27"}},

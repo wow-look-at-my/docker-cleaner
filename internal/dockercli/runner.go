@@ -13,7 +13,7 @@ import (
 // inspectChunk keeps a host with thousands of objects under ARG_MAX.
 const inspectChunk = 100
 
-// Runner executes one docker invocation. Tests substitute a fake.
+// Runner executes a docker invocation. Tests substitute a fake.
 type Runner interface {
 	Run(ctx context.Context, args ...string) (stdout []byte, stderr []byte, err error)
 }

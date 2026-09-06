@@ -55,7 +55,7 @@ func TestVolumeOfDownStackIsKeptWhileItsComposeFileExists(t *testing.T) {
 	assert.Equal(t, ReasonClaimedByCompos, reason)
 }
 
-// The same volume, once the compose file is gone and the search was
+// The same volume, after the compose file is gone and the search was
 // exhaustive. Deleting the file is what retires a project.
 func TestVolumeIsCollectedOnceItsComposeFileIsDeleted(t *testing.T) {
 	snap := dockercli.Snapshot{Volumes: []dockercli.Volume{composeVolume("webapp_pgdata", "webapp")}}

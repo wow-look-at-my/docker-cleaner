@@ -1,4 +1,4 @@
-// Package compose answers one question: would a compose project still on disk
+// Package compose answers a question: would a compose project still on disk
 // attach this resource on its next `up`? Docker cannot answer it, because the
 // labels naming a project's files live only on containers and `down` deletes
 // them. So the index below remembers what docker forgets.
@@ -21,7 +21,7 @@ const DefaultIndexPath = "/var/lib/docker-cleaner/projects.json"
 // indexSchema rises with the on-disk shape; a newer file is discarded.
 const indexSchema = 1
 
-// Entry is one project's known compose files.
+// Entry is a project's known compose files.
 type Entry struct {
 	Files []string  `json:"files"`
 	Seen  time.Time `json:"seen"`

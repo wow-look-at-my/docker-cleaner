@@ -21,6 +21,21 @@ var now = time.Date(2026, 8, 28, 12, 0, 0, 0, time.UTC)
 
 func ago(d time.Duration) string { return now.Add(-d).Format(time.RFC3339Nano) }
 
+// inspectDoc renders what `docker inspect` prints. Marshalling beats
+// pasting the text together: a path or a name carrying a quote would otherwise
+// produce a document the reader cannot parse.
+func inspectDoc(objects ...map[string]any) string {
+	body, err := json.Marshal(objects)
+	if err != nil {
+		panic(err)
+	}
+	return string(body)
+}
+
+func imageDoc(id, tag, created string, size int64) map[string]any {
+	return map[string]any{"Id": id, "RepoTags": []string{tag}, "Created": created, "Size": size}
+}
+
 // docker is a stand-in daemon: it answers the read phase from strings and
 // records every command the apply phase issues.
 type docker struct {
@@ -36,14 +51,19 @@ func newDocker() *docker {
 		"system df -v --format json": `{"LayersSize":1,"Images":[{"Id":"sha256:i1","Size":268435456}],` +
 			`"Containers":[{"Id":"c1","SizeRw":4096}],"Volumes":[],"BuildCache":[]}`,
 		"ps -aq --no-trunc": "c1\n",
-		"container inspect c1": `[{"Id":"c1","Name":"/web-old","Image":"sha256:i1",` +
-			`"Created":"` + ago(300*24*time.Hour) + `",` +
-			`"State":{"Status":"exited","FinishedAt":"` + ago(47*24*time.Hour) + `"},` +
-			`"Config":{"Image":"myapp:v1","Labels":{}},"Mounts":[],"NetworkSettings":{"Networks":{}}}]`,
+		"container inspect c1": inspectDoc(map[string]any{
+			"Id": "c1", "Name": "/web-old", "Image": "sha256:i1",
+			"Created":         ago(300 * 24 * time.Hour),
+			"State":           map[string]any{"Status": "exited", "FinishedAt": ago(47 * 24 * time.Hour)},
+			"Config":          map[string]any{"Image": "myapp:v1", "Labels": map[string]string{}},
+			"Mounts":          []any{},
+			"NetworkSettings": map[string]any{"Networks": map[string]any{}},
+		}),
 		"image ls --no-trunc --format json": "{\"ID\":\"sha256:i1\"}\n{\"ID\":\"sha256:i2\"}\n",
-		"image inspect sha256:i1 sha256:i2": `[{"Id":"sha256:i1","RepoTags":["myapp:v1"],"Created":"` +
-			ago(200*24*time.Hour) + `","Size":268435456},` +
-			`{"Id":"sha256:i2","RepoTags":["myapp:v2"],"Created":"` + ago(10*24*time.Hour) + `","Size":1000}]`,
+		"image inspect sha256:i1 sha256:i2": inspectDoc(
+			imageDoc("sha256:i1", "myapp:v1", ago(200*24*time.Hour), 268435456),
+			imageDoc("sha256:i2", "myapp:v2", ago(10*24*time.Hour), 1000),
+		),
 		"volume ls --format json":             "",
 		"network ls --no-trunc --format json": "",
 		"buildx ls --format json":             "",
@@ -79,7 +99,7 @@ func (d *docker) mutations() []string {
 	return out
 }
 
-// config builds a run whose compose search is exhaustive and cheap: one mount,
+// config builds a run whose compose search is exhaustive and cheap: a single mount,
 // an empty directory, so nothing on disk claims anything.
 func config(t *testing.T, d *docker) (Config, *bytes.Buffer, *bytes.Buffer) {
 	t.Helper()
@@ -169,8 +189,8 @@ func TestAcceptedPromptApplies(t *testing.T) {
 	}
 }
 
-// Nothing can answer a prompt with no terminal, and a silent yes is the one
-// answer this tool must never assume.
+// Nothing can answer a prompt with no terminal, and a silent yes is the answer
+// this tool must never assume.
 func TestNoTerminalAndNoYesRefusesToRun(t *testing.T) {
 	d := newDocker()
 	c, _, stderr := config(t, d)
@@ -282,8 +302,7 @@ func TestAQuietRunNeedsNoConfirmation(t *testing.T) {
 	d := newDocker()
 	d.reads["ps -aq --no-trunc"] = ""
 	d.reads["image ls --no-trunc --format json"] = "{\"ID\":\"sha256:i2\"}\n"
-	d.reads["image inspect sha256:i2"] = `[{"Id":"sha256:i2","RepoTags":["myapp:v2"],"Created":"` +
-		ago(10*24*time.Hour) + `","Size":1000}]`
+	d.reads["image inspect sha256:i2"] = inspectDoc(imageDoc("sha256:i2", "myapp:v2", ago(10*24*time.Hour), 1000))
 	c, stdout, _ := config(t, d)
 
 	code := Do(context.Background(), c)
@@ -300,13 +319,17 @@ func TestTheRunPersistsWhatItLearned(t *testing.T) {
 	require.NoError(t, os.WriteFile(file, []byte("services: {}\n"), 0o644))
 
 	d := newDocker()
-	d.reads["container inspect c1"] = `[{"Id":"c1","Name":"/webapp-db-1","Image":"sha256:i1",` +
-		`"Created":"` + ago(2*24*time.Hour) + `",` +
-		`"State":{"Status":"running","FinishedAt":"0001-01-01T00:00:00Z"},` +
-		`"Config":{"Image":"myapp:v1","Labels":{` +
-		`"com.docker.compose.project":"webapp",` +
-		`"com.docker.compose.project.config_files":"` + file + `"}},` +
-		`"Mounts":[{"Type":"volume","Name":"webapp_pgdata"}],"NetworkSettings":{"Networks":{}}}]`
+	d.reads["container inspect c1"] = inspectDoc(map[string]any{
+		"Id": "c1", "Name": "/webapp-db-1", "Image": "sha256:i1",
+		"Created": ago(2 * 24 * time.Hour),
+		"State":   map[string]any{"Status": "running", "FinishedAt": "0001-01-01T00:00:00Z"},
+		"Config": map[string]any{"Image": "myapp:v1", "Labels": map[string]string{
+			"com.docker.compose.project":              "webapp",
+			"com.docker.compose.project.config_files": file,
+		}},
+		"Mounts":          []any{map[string]any{"Type": "volume", "Name": "webapp_pgdata"}},
+		"NetworkSettings": map[string]any{"Networks": map[string]any{}},
+	})
 	d.reads["compose -f "+file+" config --format json"] =
 		`{"name":"webapp","services":{"db":{"image":"myapp:v1"}},"volumes":{"pgdata":{}}}`
 	c, _, _ := config(t, d)
@@ -319,7 +342,7 @@ func TestTheRunPersistsWhatItLearned(t *testing.T) {
 	assert.Contains(t, string(body), file)
 }
 
-// A project the index cannot explain is worth a walk; one it can is not. This
+// A project the index cannot explain is worth a walk; a project it can is not. This
 // is the whole speed claim, and it is asserted on the directory count.
 func TestAKnownProjectCostsNoWalk(t *testing.T) {
 	dir := t.TempDir()
@@ -338,7 +361,7 @@ func TestAKnownProjectCostsNoWalk(t *testing.T) {
 	require.NoError(t, os.WriteFile(c.MountInfo,
 		[]byte("27 1 259:2 / "+dir+" rw,relatime shared:1 - ext4 /dev/nvme0n1p2 rw\n"), 0o644))
 
-	// The first run learns the project from the walk, the second from the index.
+	// The earlier run learns the project from the walk, the later from the index.
 	require.Equal(t, ExitOK, Do(context.Background(), c))
 	stdout.Reset()
 	require.Equal(t, ExitOK, Do(context.Background(), c))

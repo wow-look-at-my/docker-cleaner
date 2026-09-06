@@ -16,7 +16,7 @@ const (
 	LabelConfigFiles = "com.docker.compose.project.config_files"
 )
 
-// Discovery is the compose picture for one run.
+// Discovery is the compose picture for a run.
 type Discovery struct {
 	Claims *Claims
 	// Index is carried so the caller can persist what this run learned.
@@ -25,7 +25,7 @@ type Discovery struct {
 	Complete bool
 	Failures []string
 	Skipped  []Mount
-	// DirsWalked is zero when the index answered everything.
+	// DirsWalked counts nothing when the index answered everything.
 	DirsWalked int
 	Warning    string
 }
@@ -41,7 +41,7 @@ type Options struct {
 
 // Discover resolves every compose project that could own a docker resource.
 //
-// Container labels are exact and free, so they go first. The index supplies
+// Container labels are exact and free, so they come before anything else. The index supplies
 // what `down` deleted. Only a project that neither can explain is worth a
 // filesystem walk, which is what keeps an ordinary run to a handful of stat
 // calls.
@@ -98,7 +98,7 @@ func Discover(ctx context.Context, r dockercli.Runner, containers []dockercli.Co
 	return d
 }
 
-// Resolution is what discovery concluded about one project.
+// Resolution is what discovery concluded about a project.
 type Resolution int
 
 const (

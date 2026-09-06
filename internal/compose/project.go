@@ -27,7 +27,7 @@ type config struct {
 	} `json:"networks"`
 }
 
-// Project is what one compose project would attach on its next `up`.
+// Project is what a compose project would attach on its next `up`.
 type Project struct {
 	Name     string
 	Files    []string
@@ -49,7 +49,7 @@ type Claims struct {
 
 // Resolve renders every compose file into its claims. Files that name the same
 // project are merged, because a directory holding both compose.yaml and
-// docker-compose.yml is one project described twice.
+// docker-compose.yml is the same project described by both files.
 func Resolve(ctx context.Context, r dockercli.Runner, files []string) *Claims {
 	c := &Claims{
 		Projects:   map[string]*Project{},

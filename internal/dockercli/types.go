@@ -1,6 +1,6 @@
 // Package dockercli reads and mutates docker state through the docker CLI.
 // Every field here is optional: docker's JSON key casing has drifted across
-// versions, so a missing key must decode to a zero value, never fail the run.
+// versions, so a missing key must decode to an empty value, never fail the run.
 package dockercli
 
 import "time"
@@ -17,7 +17,7 @@ type Version struct {
 	} `json:"Server"`
 }
 
-// Container is one element of `docker container inspect`.
+// Container is an element of `docker container inspect`.
 type Container struct {
 	ID      string `json:"Id"`
 	Created string `json:"Created"`
@@ -50,7 +50,7 @@ type Container struct {
 	} `json:"NetworkSettings"`
 }
 
-// Image is one element of `docker image inspect`.
+// Image is an element of `docker image inspect`.
 type Image struct {
 	ID          string   `json:"Id"`
 	RepoTags    []string `json:"RepoTags"`
@@ -61,7 +61,7 @@ type Image struct {
 	Size    int64  `json:"Size"`
 }
 
-// Volume is one element of `docker volume inspect`.
+// Volume is an element of `docker volume inspect`.
 type Volume struct {
 	Name      string            `json:"Name"`
 	Driver    string            `json:"Driver"`
@@ -70,7 +70,7 @@ type Volume struct {
 	Scope     string            `json:"Scope"`
 }
 
-// Network is one element of `docker network inspect`.
+// Network is an element of `docker network inspect`.
 type Network struct {
 	ID         string `json:"Id"`
 	Name       string `json:"Name"`
@@ -112,7 +112,7 @@ type DiskUsage struct {
 	BuildCache []CacheRecord `json:"BuildCache"`
 }
 
-// CacheRecord is one build cache entry.
+// CacheRecord is a build cache entry.
 type CacheRecord struct {
 	ID         string  `json:"ID"`
 	Type       string  `json:"Type"`
@@ -124,7 +124,7 @@ type CacheRecord struct {
 	UsageCount int     `json:"UsageCount"`
 }
 
-// Builder is one element of `docker buildx ls --format json`.
+// Builder is an element of `docker buildx ls --format json`.
 type Builder struct {
 	Name   string `json:"Name"`
 	Driver string `json:"Driver"`
@@ -139,7 +139,7 @@ type Cache struct {
 	Records []CacheRecord
 }
 
-// Snapshot is everything one read phase gathered.
+// Snapshot is everything the read phase gathered.
 type Snapshot struct {
 	Version    Version
 	DiskUsage  DiskUsage
@@ -154,7 +154,7 @@ type Snapshot struct {
 }
 
 // ParseTime reads docker's RFC3339Nano timestamps, rejecting the empty string
-// and the zero value FinishedAt carries when a container never ran. Both would
+// and the unset FinishedAt a container that never ran carries. Both would
 // otherwise compare as older than every cutoff.
 func ParseTime(s string) (time.Time, bool) {
 	if s == "" {
