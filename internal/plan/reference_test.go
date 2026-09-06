@@ -33,7 +33,7 @@ func TestIsAnonymousVolume(t *testing.T) {
 func TestMatchKeep(t *testing.T) {
 	names := []string{"registry.local/team/app:v1", "sha256:11aa22bb33cc", "11aa22bb33cc"}
 
-	// * spans / on purpose, so one pattern covers a whole registry.
+	// * spans / on purpose, so a pattern covers a whole registry.
 	assert.Equal(t, "registry.local/*", MatchKeep([]string{"registry.local/*"}, names))
 	assert.Equal(t, "*/app:*", MatchKeep([]string{"*/app:*"}, names))
 	assert.Equal(t, "sha256:11aa*", MatchKeep([]string{"sha256:11aa*"}, names))

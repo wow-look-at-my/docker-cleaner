@@ -64,7 +64,7 @@ func (b *builder) selectContainers() {
 }
 
 // aliveState reports the states that hold their resources open. Each gets its
-// own reason: a paused container is not the same finding as a running one, and
+// own reason: a paused container is not the same finding as a running container, and
 // a report that says so saves the next person a look.
 func aliveState(status string) (Reason, bool) {
 	switch status {
@@ -84,7 +84,7 @@ func aliveState(status string) (Reason, bool) {
 }
 
 // containerAge picks the timestamp meaning "offline since". A container that
-// never ran has FinishedAt at the zero time, which parses to year one and so
+// never ran leaves FinishedAt unset, which beats every cutoff and so
 // beats every cutoff; comparing it naively deletes containers made a minute
 // ago. A created container ages by creation, and any other state without a
 // usable FinishedAt is kept.
@@ -101,7 +101,7 @@ func containerAge(c dockercli.Container) (time.Time, string, bool) {
 	return time.Time{}, "", false
 }
 
-// containerNote flags a container worth a second look before confirming. It
+// containerNote flags a container worth another look before confirming. It
 // never changes the verdict.
 func containerNote(c dockercli.Container) string {
 	switch p := c.HostConfig.RestartPolicy.Name; p {

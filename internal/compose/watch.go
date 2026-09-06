@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// event is one line of `docker events --format json`.
+// event is a line of `docker events --format json`.
 type event struct {
 	Type   string `json:"Type"`
 	Action string `json:"Action"`
@@ -21,8 +21,8 @@ type event struct {
 
 // Watch records every compose project docker creates a container for.
 //
-// It narrows one window and nothing more: an `up` followed by a `down` between
-// two cleanup runs leaves no container to read labels from. It is never a
+// It narrows a window and nothing more: an `up` followed by a `down` between
+// cleanup runs leaves no container to read labels from. It is never a
 // correctness dependency, because a project it misses is simply unresolved,
 // and an unresolved project falls through to the filesystem scan.
 func Watch(ctx context.Context, dockerBin, indexPath string, log io.Writer) error {
@@ -58,8 +58,8 @@ func Watch(ctx context.Context, dockerBin, indexPath string, log io.Writer) erro
 	return cmd.Wait()
 }
 
-// ProjectFromEvent extracts a project and its compose files from one event.
-// A one-off `compose run` container carries the same labels and is just as
+// ProjectFromEvent extracts a project and its compose files from an event.
+// A throwaway `compose run` container carries the same labels and is just as
 // good a source: oneoff=True does not make its config_files less true.
 func ProjectFromEvent(line []byte) (project string, files []string, ok bool) {
 	var e event

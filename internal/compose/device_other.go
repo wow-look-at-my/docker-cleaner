@@ -4,13 +4,14 @@ package compose
 
 import "os"
 
-// deviceOf cannot identify a filesystem portably. Off Linux the walk therefore
-// does not stop at mount boundaries; it still refuses to follow symlinks, and
-// mount discovery itself needs /proc/self/mountinfo, so this path is only
-// reached when a caller supplies its own roots.
-func deviceOf(path string) (uint64, bool) {
+// identify cannot name a file by device and inode portably, so off Linux the
+// path stands in. The walk there does not stop at mount boundaries; it still
+// refuses to follow symlinks, it still stops at its depth limit, and mount
+// discovery itself needs /proc/self/mountinfo, so this path is only reached
+// when a caller supplies its own roots.
+func identify(path string) (fileID, bool) {
 	if _, err := os.Lstat(path); err != nil {
-		return 0, false
+		return fileID{}, false
 	}
-	return 0, true
+	return fileID{path: path}, true
 }

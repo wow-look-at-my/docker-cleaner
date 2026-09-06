@@ -9,7 +9,7 @@ import (
 	"github.com/wow-look-at-my/go-containers/set"
 )
 
-// builder carries the state one Compute call threads through its phases.
+// builder carries the state a Compute call threads through its phases.
 type builder struct {
 	snap        dockercli.Snapshot
 	opt         Options
@@ -86,7 +86,7 @@ func Compute(s dockercli.Snapshot, d *compose.Discovery, o Options, now time.Tim
 		sort.Strings(b.plan.Warnings)
 	}
 
-	// Containers go first so the cascade sees what their removal frees.
+	// Containers go before the rest, so the cascade sees what their removal frees.
 	b.selectContainers()
 	b.refs = buildRefs(s.Containers, s.Networks, b.removing)
 
@@ -124,7 +124,7 @@ func (b *builder) claims() *compose.Claims {
 
 // composeUnresolved handles a resource whose project no compose file explains.
 // After an exhaustive search that means the project was deleted, so the
-// resource collects. After an incomplete one it means nothing, so it is kept:
+// resource collects. After an incomplete search it means nothing, so it is kept:
 // not looking is never evidence.
 func (b *builder) composeUnresolved(labels map[string]string) (Reason, string, bool) {
 	project := labels[compose.LabelProject]
@@ -152,7 +152,7 @@ func (b *builder) composeImageProject(img dockercli.Image) (string, bool) {
 }
 
 // composeUnresolvedImage keeps every image while any compose file failed to
-// render: an unreadable file may name this one.
+// render: an unreadable file may name this image.
 func (b *builder) composeUnresolvedImage(dockercli.Image) (Reason, string, bool) {
 	if b.disco == nil || b.disco.Complete {
 		return "", "", false

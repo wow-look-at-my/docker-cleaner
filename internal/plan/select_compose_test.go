@@ -28,7 +28,8 @@ const webappProject = `{
 // liveProject is discovery on a machine whose webapp compose file is present.
 func liveProject(t *testing.T) *compose.Discovery {
 	t.Helper()
-	claims := compose.Resolve(context.Background(), composeRunner{webappProject}, []string{"/srv/webapp/compose.yaml"})
+	claims := compose.Resolve(context.Background(), composeRunner{webappProject},
+		[]string{"/srv/webapp/compose.yaml"}, nil)
 	return &compose.Discovery{Claims: claims, Complete: true}
 }
 
@@ -55,7 +56,7 @@ func TestVolumeOfDownStackIsKeptWhileItsComposeFileExists(t *testing.T) {
 	assert.Equal(t, ReasonClaimedByCompos, reason)
 }
 
-// The same volume, once the compose file is gone and the search was
+// The same volume, after the compose file is gone and the search was
 // exhaustive. Deleting the file is what retires a project.
 func TestVolumeIsCollectedOnceItsComposeFileIsDeleted(t *testing.T) {
 	snap := dockercli.Snapshot{Volumes: []dockercli.Volume{composeVolume("webapp_pgdata", "webapp")}}

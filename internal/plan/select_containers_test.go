@@ -26,8 +26,8 @@ func TestStaleContainerSelectedByFinishedAt(t *testing.T) {
 	assert.Equal(t, ReasonTooRecent, reason)
 }
 
-// A container that never ran carries FinishedAt at the zero time, which parses
-// to year one and therefore beats every cutoff. Treating that as an age would
+// A container that never ran leaves FinishedAt unset, which parses to a year
+// before every cutoff and therefore beats it. Treating that as an age would
 // delete containers created minutes ago.
 func TestZeroFinishedAtIsNeverStale(t *testing.T) {
 	for _, finished := range []string{"0001-01-01T00:00:00Z", ""} {

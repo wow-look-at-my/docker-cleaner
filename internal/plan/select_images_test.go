@@ -26,7 +26,7 @@ func TestNewestPerRepositoryIsKept(t *testing.T) {
 	assert.Equal(t, ReasonNewestInRepo, reason)
 }
 
-// A registry port is not a tag separator, so these are one repository.
+// A registry port is not a tag separator, so these are the same repository.
 func TestNewestPerRepositoryHandlesRegistryPorts(t *testing.T) {
 	snap := dockercli.Snapshot{Images: []dockercli.Image{
 		image("sha256:a", ago(200*24*time.Hour), "localhost:5000/tools:build-1"),
@@ -90,7 +90,8 @@ func TestCascadeFreesImageAndAttributesIt(t *testing.T) {
 	assert.Equal(t, []string{"web-old"}, got.FreedBy)
 }
 
-// An id tagged in two repositories and kept for one must not be untagged in
+// An id tagged in several repositories and kept for any of them must not be
+// untagged in
 // the other: a partial untag destroys a reference the user still has.
 func TestImageKeptInOneRepositoryIsNotUntaggedInAnother(t *testing.T) {
 	snap := dockercli.Snapshot{Images: []dockercli.Image{
@@ -145,7 +146,7 @@ func TestDigestPinnedImageIsNoted(t *testing.T) {
 	assert.Contains(t, p.Images[0].Note, "ghcr.io/acme/api@sha256:pinned")
 }
 
-// Docker refuses to delete an image another image is built on, so listing one
+// Docker refuses to delete an image another image is built on, so listing it
 // would promise a removal that cannot happen.
 func TestParentOfKeptImageIsNotPlanned(t *testing.T) {
 	base := image("sha256:base", ago(300*24*time.Hour))

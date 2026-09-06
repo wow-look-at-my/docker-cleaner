@@ -5,7 +5,7 @@ package run
 const (
 	// ExitOK covers a clean apply, a dry run, nothing to do, and a decline.
 	ExitOK = 0
-	// ExitApplyFailed means one or more removals were rejected.
+	// ExitApplyFailed means docker rejected a removal the plan listed.
 	ExitApplyFailed = 1
 	// ExitUsage means the invocation itself was wrong.
 	ExitUsage = 2

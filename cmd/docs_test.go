@@ -12,8 +12,8 @@ import (
 
 const docsPath = "../docs/cmdline_args.txt"
 
-// The flag reference is generated, never typed: a hand-written copy drifts the
-// first time a flag's help changes, and nothing notices.
+// The flag reference is generated, never typed: a hand-written copy drifts as
+// soon as a flag's help changes, and nothing notices.
 func TestCommittedFlagReferenceIsCurrent(t *testing.T) {
 	got, err := HelpDump()
 	require.NoError(t, err)
@@ -75,7 +75,7 @@ func TestExtraArgumentsAreRejected(t *testing.T) {
 	assert.Contains(t, err.Error(), "unknown command")
 }
 
-// runRoot parses one invocation. Every case here fails before RunE reaches
+// runRoot parses an invocation. Every case here fails before RunE reaches
 // docker, so nothing runs and nothing exits.
 func runRoot(t *testing.T, args ...string) error {
 	t.Helper()

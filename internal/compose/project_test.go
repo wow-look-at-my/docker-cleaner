@@ -10,7 +10,7 @@ import (
 
 func resolve(t *testing.T, r *configRunner, files ...string) *Claims {
 	t.Helper()
-	return Resolve(context.Background(), r, files)
+	return Resolve(context.Background(), r, files, nil)
 }
 
 // The docker name of a volume is not its compose key. Concatenating the project
@@ -54,8 +54,9 @@ func TestTheResolvedProjectNameWins(t *testing.T) {
 	assert.Equal(t, []string{"chosen_data"}, c.Projects["chosen"].Volumes)
 }
 
-// A directory holding both compose.yaml and docker-compose.yml is one project
-// described twice. Letting the last file win would drop the other's volumes.
+// A directory holding compose.yaml and docker-compose.yml together is the same
+// project described by both files. Letting the last file win would drop the
+// other's volumes.
 func TestTwoFilesForOneProjectUnionTheirClaims(t *testing.T) {
 	r := &configRunner{byFile: map[string]string{
 		"/srv/app/compose.yaml": `{"name":"webapp","services":{"a":{"image":"nginx:1.27"}},
@@ -142,7 +143,7 @@ func TestNoFilesMeansNoClaims(t *testing.T) {
 func TestRenderAsksComposeForJSON(t *testing.T) {
 	r := &recordingRunner{body: project("webapp")}
 
-	Resolve(context.Background(), r, []string{"/srv/app/compose.yaml"})
+	Resolve(context.Background(), r, []string{"/srv/app/compose.yaml"}, nil)
 
 	assert.Equal(t,
 		[]string{"compose", "-f", "/srv/app/compose.yaml", "config", "--format", "json"},

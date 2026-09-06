@@ -1,6 +1,7 @@
 package compose
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -30,7 +31,7 @@ func TestWalkFindsEverySpellingAtEveryDepth(t *testing.T) {
 	}
 	write(t, filepath.Join(root, "a", "notes.yaml"))
 
-	res, err := (&FSScanner{Mounts: []Mount{{Point: root}}}).Scan()
+	res, err := (&FSScanner{Mounts: []Mount{{Point: root}}}).Scan(context.Background())
 
 	require.NoError(t, err)
 	assert.ElementsMatch(t, want, res.Files)
@@ -38,8 +39,8 @@ func TestWalkFindsEverySpellingAtEveryDepth(t *testing.T) {
 	assert.Positive(t, res.Dirs)
 }
 
-// A symlink is either a second route to something already walked or a route
-// off this filesystem, so following one only costs time.
+// A symlink is either another route to something already walked or a route
+// off this filesystem, so following it only costs time.
 func TestWalkDoesNotFollowSymlinks(t *testing.T) {
 	root := t.TempDir()
 	real := t.TempDir()
@@ -47,7 +48,7 @@ func TestWalkDoesNotFollowSymlinks(t *testing.T) {
 	require.NoError(t, os.Symlink(real, filepath.Join(root, "link")))
 	require.NoError(t, os.Symlink(filepath.Join(real, "compose.yaml"), filepath.Join(root, "compose.yaml")))
 
-	res, err := (&FSScanner{Mounts: []Mount{{Point: root}}}).Scan()
+	res, err := (&FSScanner{Mounts: []Mount{{Point: root}}}).Scan(context.Background())
 
 	require.NoError(t, err)
 	assert.Empty(t, res.Files)
@@ -58,7 +59,7 @@ func TestWalkSkipsGitDirectories(t *testing.T) {
 	write(t, filepath.Join(root, ".git", "modules", "x", "compose.yaml"))
 	write(t, filepath.Join(root, "compose.yaml"))
 
-	res, err := (&FSScanner{Mounts: []Mount{{Point: root}}}).Scan()
+	res, err := (&FSScanner{Mounts: []Mount{{Point: root}}}).Scan(context.Background())
 
 	require.NoError(t, err)
 	assert.Equal(t, []string{filepath.Join(root, "compose.yaml")}, res.Files)
@@ -77,7 +78,7 @@ func TestUnreadableDirectoryIsReportedAndBreaksCompleteness(t *testing.T) {
 	require.NoError(t, os.Chmod(locked, 0o000))
 	t.Cleanup(func() { _ = os.Chmod(locked, 0o755) })
 
-	res, err := (&FSScanner{Mounts: []Mount{{Point: root}}}).Scan()
+	res, err := (&FSScanner{Mounts: []Mount{{Point: root}}}).Scan(context.Background())
 
 	require.NoError(t, err)
 	assert.False(t, res.Complete())
@@ -95,7 +96,7 @@ func TestSkippedMountsAreReportedNotDropped(t *testing.T) {
 		{Point: "/proc", FSType: "proc", Skip: "kernel filesystem (proc)"},
 	}
 
-	res, err := (&FSScanner{Mounts: mounts, Workers: 2}).Scan()
+	res, err := (&FSScanner{Mounts: mounts, Workers: 2}).Scan(context.Background())
 
 	require.NoError(t, err)
 	require.Len(t, res.Skipped, 1)
@@ -104,7 +105,7 @@ func TestSkippedMountsAreReportedNotDropped(t *testing.T) {
 }
 
 func TestUnstattableMountIsAFailure(t *testing.T) {
-	res, err := (&FSScanner{Mounts: []Mount{{Point: "/definitely/not/here"}}}).Scan()
+	res, err := (&FSScanner{Mounts: []Mount{{Point: "/definitely/not/here"}}}).Scan(context.Background())
 
 	require.NoError(t, err)
 	assert.False(t, res.Complete())
@@ -122,7 +123,7 @@ func TestEveryMountIsWalked(t *testing.T) {
 		want = append(want, f)
 	}
 
-	res, err := (&FSScanner{Mounts: mounts, Workers: 4}).Scan()
+	res, err := (&FSScanner{Mounts: mounts, Workers: 4}).Scan(context.Background())
 
 	require.NoError(t, err)
 	assert.ElementsMatch(t, want, res.Files)

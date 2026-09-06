@@ -95,7 +95,7 @@ func (b *builder) selectImages() {
 }
 
 // newestPerRepo finds the image to keep in each repository. A repository whose
-// images all lack a usable timestamp keeps every one of them: picking an
+// images all lack a usable timestamp keeps them all: picking an
 // arbitrary winner there would delete real versions on the strength of a
 // coin flip.
 func newestPerRepo(images []dockercli.Image) (newest, noTimestamps map[string]string) {
@@ -155,7 +155,7 @@ func taggedLatest(images []dockercli.Image) map[string]bool {
 }
 
 // protectParents keeps any image another surviving image is built on. Docker
-// refuses to remove one anyway, so listing it in the plan would promise a
+// refuses to remove it anyway, so listing it in the plan would promise a
 // deletion that cannot happen. The loop repeats because a parent's parent must
 // survive too.
 func (b *builder) protectParents(candidates []dockercli.Image, byID map[string]dockercli.Image, kept map[string]Kept) []dockercli.Image {

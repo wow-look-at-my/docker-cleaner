@@ -77,7 +77,7 @@ Dry run: nothing was removed.
 {{- end}}
 `))
 
-// section is one group of removals.
+// section is a group of removals.
 type section struct {
 	Title   string
 	Targets []plan.Target
@@ -120,7 +120,7 @@ func completeness(p plan.Plan) string {
 	return "SEARCH INCOMPLETE, so unresolved projects were kept"
 }
 
-// keptLines groups by reason so common cases read as one line, while
+// keptLines groups by reason so common cases read as a line, while
 // --show-kept names every resource.
 func keptLines(p plan.Plan, showKept bool) []string {
 	if len(p.Kept) == 0 {

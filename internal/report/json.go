@@ -32,7 +32,7 @@ type Doc struct {
 	ExitCode        int         `json:"exit_code"`
 }
 
-// Item is one planned removal.
+// Item is a planned removal.
 type Item struct {
 	ID       string     `json:"id"`
 	Name     string     `json:"name"`
@@ -43,7 +43,7 @@ type Item struct {
 	Commands [][]string `json:"commands"`
 }
 
-// CacheItem is one builder's prune.
+// CacheItem is a builder's prune.
 type CacheItem struct {
 	Builder string   `json:"builder"`
 	Records int      `json:"records"`
@@ -52,7 +52,7 @@ type CacheItem struct {
 	Command []string `json:"command"`
 }
 
-// KeptItem is one resource left alone, and why.
+// KeptItem is a resource left alone, and why.
 type KeptItem struct {
 	Kind   string `json:"kind"`
 	Name   string `json:"name"`
@@ -60,7 +60,7 @@ type KeptItem struct {
 	Detail string `json:"detail,omitempty"`
 }
 
-// Operation is one command that actually ran.
+// Operation is a command that actually ran.
 type Operation struct {
 	Argv []string `json:"argv"`
 	OK   bool     `json:"ok"`

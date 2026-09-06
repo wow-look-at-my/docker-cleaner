@@ -8,7 +8,7 @@ import (
 	"github.com/wow-look-at-my/docker-cleaner/internal/dockercli"
 )
 
-// now is the one clock reading every test computes against.
+// now is the clock reading every test computes against.
 var now = time.Date(2026, 8, 28, 12, 0, 0, 0, time.UTC)
 
 func ago(d time.Duration) string { return now.Add(-d).Format(time.RFC3339Nano) }
@@ -32,7 +32,7 @@ func image(id, created string, tags ...string) dockercli.Image {
 // noComposeFiles is discovery on a machine with no compose projects at all,
 // having searched exhaustively.
 func noComposeFiles() *compose.Discovery {
-	return &compose.Discovery{Claims: compose.Resolve(context.Background(), nil, nil), Complete: true}
+	return &compose.Discovery{Claims: compose.Resolve(context.Background(), nil, nil, nil), Complete: true}
 }
 
 // incompleteSearch is discovery that could not look everywhere.

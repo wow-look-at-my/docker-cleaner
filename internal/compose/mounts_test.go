@@ -57,7 +57,8 @@ func TestDockerStorageRootIsSkipped(t *testing.T) {
 	assert.Equal(t, "docker storage root", find(t, mounts, "/var/lib/docker").Skip)
 }
 
-// mountinfo escapes a space as \040, and a project can live under such a path.
+// mountinfo escapes a space as an octal code, and a project can live under
+// such a path.
 func TestMountPointEscapesAreDecoded(t *testing.T) {
 	mounts := mountsFromFixture(t)
 
