@@ -51,7 +51,7 @@ func Read(ctx context.Context, r Runner, p *progress.Reporter) (Snapshot, error)
 		return s, errors.New("docker daemon is not reachable")
 	}
 
-	found, err := list(ctx, r)
+	found, err := list(ctx, r, p)
 	if err != nil {
 		return s, err
 	}
@@ -116,28 +116,33 @@ func Read(ctx context.Context, r Runner, p *progress.Reporter) (Snapshot, error)
 
 // list enumerates what the machine holds. Every call here returns names only,
 // so the daemon measures nothing and answers straight away.
-func list(ctx context.Context, r Runner) (listing, error) {
+func list(ctx context.Context, r Runner, p *progress.Reporter) (listing, error) {
 	var l listing
 
+	// Each listing names itself: a huge image set, or a gone builder, is slow.
+	p.Stage("listing containers")
 	out, errb, err := r.Run(ctx, "ps", "-aq", "--no-trunc")
 	if err != nil {
 		return l, fmt.Errorf("docker ps: %w: %s", err, strings.TrimSpace(string(errb)))
 	}
 	l.containers = lines(out)
 
-	// `image ls` runs without -a on purpose: -a surfaces intermediate images,
-	// whose removal docker refuses and which no user asked to reclaim.
+	// No -a on purpose: it surfaces intermediate images docker refuses to remove.
+	p.Stage("listing images")
 	if l.images, err = listField(ctx, r, "ID", "image", "ls", "--no-trunc", "--format", "json"); err != nil {
 		return l, err
 	}
+	p.Stage("listing volumes")
 	if l.volumes, err = listField(ctx, r, "Name", "volume", "ls", "--format", "json"); err != nil {
 		return l, err
 	}
+	p.Stage("listing networks")
 	if l.networks, err = listField(ctx, r, "ID", "network", "ls", "--no-trunc", "--format", "json"); err != nil {
 		return l, err
 	}
 
 	// No buildx is not a failure: the disk-usage pass still reports the cache.
+	p.Stage("listing builders")
 	l.builders, _ = runNDJSON[Builder](ctx, r, "buildx", "ls", "--format", "json")
 	return l, nil
 }
