@@ -257,40 +257,40 @@ tests:
 			- "VOLUMES TO REMOVE"
 			- "webapp_pgdata"
 
-	- desc: a project is found beside the ones docker names, without reading the disk at large
-	  cmd: 'mkdir -p {outputs.proj}/webapp {outputs.proj}/other; cp {inputs.docker-compose.yml} {outputs.proj}/webapp/docker-compose.yml; cp {inputs.docker-compose.yml} {outputs.proj}/other/docker-compose.yml; cp {inputs.seed.json} {outputs.index.json}; B=$(cat {shared.bin}); FAKE_DOCKER_STATE=$(dirname {inputs.version.json}) $B --dry-run --docker-bin dats/fixtures/fake-docker --index {outputs.index.json} --show-kept'
+	- desc: a stopped container names its project's file, so its stack keeps the volume
+	  cmd: 'mkdir -p {outputs.proj}/webapp; cp {inputs.docker-compose.yml} {outputs.proj}/webapp/docker-compose.yml; B=$(cat {shared.bin}); FAKE_DOCKER_STATE=$(dirname {inputs.version.json}) $B --dry-run --docker-bin dats/fixtures/fake-docker --index {outputs.index.json} --show-kept'
 	  inputs:
 		files:
 			version.json: '{"Client":{"Version":"29.3.1"},"Server":{"Version":"29.3.1"}}'
-			ps.txt: ""
+			ps.txt: "c1"
 			image_ls.json: ""
 			network_ls.json: ""
 			buildx_ls.json: ""
 			volume_ls.json: '{"Name":"webapp_pgdata"}'
 			volume_inspect.json: '[{"Name":"webapp_pgdata","Driver":"local","Scope":"local","Labels":{"com.docker.compose.project":"webapp"}}]'
+			container_inspect.json: '[{"Id":"c1","Name":"/webapp-db-1","Image":"sha256:i1","Created":"2020-01-01T00:00:00Z","State":{"Status":"exited","FinishedAt":"2020-02-01T00:00:00Z"},"Config":{"Image":"postgres:16","Labels":{"com.docker.compose.project":"webapp","com.docker.compose.project.config_files":"{outputs.proj}/webapp/docker-compose.yml"}},"HostConfig":{"RestartPolicy":{"Name":"no"}},"Mounts":[],"NetworkSettings":{"Networks":{}}}]'
 			compose_config.json: '{"name":"webapp","volumes":{"pgdata":{"name":"webapp_pgdata"}}}'
 			docker-compose.yml: "services:\n  db:\n    image: postgres:16\n"
-			seed.json: '{"schema":1,"projects":{"other":{"files":["{outputs.proj}/other/docker-compose.yml"],"seen":"2026-01-01T00:00:00Z"}}}'
 	  outputs:
 		stdout:
 			- "claimed by a compose project still on disk"
 		!stdout:
 			- "VOLUMES TO REMOVE"
 
-	- desc: what a run learns about a project it writes down for the next one
-	  cmd: 'mkdir -p {outputs.proj}/webapp {outputs.proj}/other; cp {inputs.docker-compose.yml} {outputs.proj}/webapp/docker-compose.yml; cp {inputs.docker-compose.yml} {outputs.proj}/other/docker-compose.yml; cp {inputs.seed.json} {outputs.index.json}; B=$(cat {shared.bin}); FAKE_DOCKER_STATE=$(dirname {inputs.version.json}) $B --dry-run --docker-bin dats/fixtures/fake-docker --index {outputs.index.json}'
+	- desc: what a container names about its project the run writes down for the next one
+	  cmd: 'mkdir -p {outputs.proj}/webapp; cp {inputs.docker-compose.yml} {outputs.proj}/webapp/docker-compose.yml; B=$(cat {shared.bin}); FAKE_DOCKER_STATE=$(dirname {inputs.version.json}) $B --dry-run --docker-bin dats/fixtures/fake-docker --index {outputs.index.json}'
 	  inputs:
 		files:
 			version.json: '{"Client":{"Version":"29.3.1"},"Server":{"Version":"29.3.1"}}'
-			ps.txt: ""
+			ps.txt: "c1"
 			image_ls.json: ""
 			network_ls.json: ""
 			buildx_ls.json: ""
 			volume_ls.json: '{"Name":"webapp_pgdata"}'
 			volume_inspect.json: '[{"Name":"webapp_pgdata","Driver":"local","Scope":"local","Labels":{"com.docker.compose.project":"webapp"}}]'
+			container_inspect.json: '[{"Id":"c1","Name":"/webapp-db-1","Image":"sha256:i1","Created":"2020-01-01T00:00:00Z","State":{"Status":"exited","FinishedAt":"2020-02-01T00:00:00Z"},"Config":{"Image":"postgres:16","Labels":{"com.docker.compose.project":"webapp","com.docker.compose.project.config_files":"{outputs.proj}/webapp/docker-compose.yml"}},"HostConfig":{"RestartPolicy":{"Name":"no"}},"Mounts":[],"NetworkSettings":{"Networks":{}}}]'
 			compose_config.json: '{"name":"webapp","volumes":{"pgdata":{"name":"webapp_pgdata"}}}'
 			docker-compose.yml: "services:\n  db:\n    image: postgres:16\n"
-			seed.json: '{"schema":1,"projects":{"other":{"files":["{outputs.proj}/other/docker-compose.yml"],"seen":"2026-01-01T00:00:00Z"}}}'
 	  outputs:
 		!stdout:
 			- "VOLUMES TO REMOVE"

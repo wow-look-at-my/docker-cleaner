@@ -331,34 +331,29 @@ func TestTheRunPersistsWhatItLearned(t *testing.T) {
 	assert.Contains(t, string(body), file)
 }
 
-// A container names where its project lives, and a project beside it is found
-// by reading that directory rather than the whole machine.
-func TestAProjectBesideAKnownOneIsFound(t *testing.T) {
+// A stopped container names its project's file, so the stack it belongs to
+// keeps its volume without anything reading a directory.
+func TestAStoppedStackKeepsItsVolumeFromItsOwnLabel(t *testing.T) {
 	root := t.TempDir()
 	live := filepath.Join(root, "webapp", "compose.yaml")
-	dead := filepath.Join(root, "archive", "compose.yaml")
-	for _, f := range []string{live, dead} {
-		require.NoError(t, os.MkdirAll(filepath.Dir(f), 0o755))
-		require.NoError(t, os.WriteFile(f, []byte("services: {}\n"), 0o644))
-	}
+	require.NoError(t, os.MkdirAll(filepath.Dir(live), 0o755))
+	require.NoError(t, os.WriteFile(live, []byte("services: {}\n"), 0o644))
 
 	d := newDocker()
 	d.reads["container inspect --size c1"] = inspectDoc(map[string]any{
 		"Id": "c1", "Name": "/webapp-db-1", "Image": "sha256:i1",
-		"Created": ago(2 * 24 * time.Hour),
-		"State":   map[string]any{"Status": "running", "FinishedAt": "0001-01-01T00:00:00Z"},
+		"Created": ago(400 * 24 * time.Hour),
+		"State":   map[string]any{"Status": "exited", "FinishedAt": ago(400 * 24 * time.Hour)},
 		"Config": map[string]any{"Image": "myapp:v1", "Labels": map[string]string{
 			"com.docker.compose.project":              "webapp",
 			"com.docker.compose.project.config_files": live,
-			"com.docker.compose.project.working_dir":  filepath.Dir(live),
 		}},
 		"NetworkSettings": map[string]any{"Networks": map[string]any{}},
 	})
-	d.reads["volume ls --format json"] = `{"Name":"archive_data"}` + "\n"
-	d.reads["volume inspect archive_data"] = `[{"Name":"archive_data","Driver":"local","Scope":"local",` +
-		`"Labels":{"com.docker.compose.project":"archive"}}]`
-	d.reads["compose -f "+live+" config --format json"] = `{"name":"webapp","services":{"db":{"image":"myapp:v1"}}}`
-	d.reads["compose -f "+dead+" config --format json"] = `{"name":"archive","volumes":{"data":{}}}`
+	d.reads["volume ls --format json"] = `{"Name":"webapp_data"}` + "\n"
+	d.reads["volume inspect webapp_data"] = `[{"Name":"webapp_data","Driver":"local","Scope":"local",` +
+		`"Labels":{"com.docker.compose.project":"webapp"}}]`
+	d.reads["compose -f "+live+" config --format json"] = `{"name":"webapp","volumes":{"data":{}}}`
 	c, stdout, _ := config(t, d)
 	c.DryRun = true
 

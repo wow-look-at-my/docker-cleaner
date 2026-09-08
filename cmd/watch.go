@@ -21,8 +21,8 @@ Docker names a project's compose files on the containers it creates and forgets
 them when those containers go. Running this keeps the record, so a stack that
 came up and went down between two cleanups is still recognised.
 
-It is an optimisation, never a requirement: a project this misses is looked for
-beside the projects docker still names, and a project found nowhere is kept.`,
+It is an optimisation, never a requirement: a project this misses is kept
+rather than removed.`,
 		Args:          cobra.NoArgs,
 		SilenceUsage:  true,
 		SilenceErrors: true,

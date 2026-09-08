@@ -29,9 +29,9 @@ Bind mounts (docker cannot), anything a surviving container holds, and the newes
 
 Docker already knows where those files are. Every container carries its project's compose files and working directory in a label, running or stopped. The tool copies that into an index at `/var/lib/docker-cleaner/projects.json`, so the paths survive the `down` that deletes the containers. A run is label reads, index lookups and `stat` calls. It never crawls the disk.
 
-A project neither explains is looked for beside the project directories docker did name. Compose names a project after its own directory, and stacks sit together, so this costs a directory read per parent.
+Nothing is hunted for on the disk. A project that has ever been started names its own files, so the only projects neither source explains are ones nothing ever started here. Those are kept, not removed.
 
-A project nothing has ever named a file for is kept, not removed. Retirement needs evidence: a path docker gave us that is now gone. Not looking is never evidence of deletion.
+Retirement needs evidence: a path docker gave us that is now gone. Not looking is never evidence of deletion.
 
 ## While it works
 
@@ -41,7 +41,7 @@ A run reports each step on stderr. It names the docker read it waits on and the 
 
 ### Optional: `docker-cleaner watch`
 
-Docker forgets a project's file paths when its containers go, so a stack brought up and down between two cleanups leaves nothing to read. `docker-cleaner watch` tails `docker events` and records those paths as containers are created. It is an optimisation, never a requirement. A project it misses is looked for beside the ones docker still names, and a project found nowhere is kept.
+Docker forgets a project's file paths when its containers go, so a stack brought up and down between two cleanups leaves nothing to read. `docker-cleaner watch` tails `docker events` and records those paths as containers are created. It is an optimisation, never a requirement. A project it misses is kept rather than removed.
 
 ```ini
 # /etc/systemd/system/docker-cleaner-watch.service

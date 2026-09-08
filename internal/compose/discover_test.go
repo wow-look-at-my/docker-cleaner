@@ -58,17 +58,13 @@ func project(name string) string {
 
 func labelled(project, files string) dockercli.Container {
 	var c dockercli.Container
-	c.Config.Labels = map[string]string{
-		LabelProject:     project,
-		LabelConfigFiles: files,
-		LabelWorkingDir:  filepath.Dir(files),
-	}
+	c.Config.Labels = map[string]string{LabelProject: project, LabelConfigFiles: files}
 	return c
 }
 
-// The load-bearing performance claim: on a machine the tool already knows, a
-// run is index lookups and stat calls. Nothing reads a directory.
-func TestAKnownProjectCostsNoProbe(t *testing.T) {
+// The load-bearing performance claim: a run is label reads, index lookups and
+// stat calls. Nothing reads a directory.
+func TestAKnownProjectCostsNoDirectoryRead(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "webapp", "compose.yaml")
 	write(t, file)
@@ -98,53 +94,20 @@ func TestContainerLabelsResolveAProjectForFree(t *testing.T) {
 	assert.Equal(t, []string{file}, idx.Files("webapp"), "the label is remembered for after the down")
 }
 
-// A project whose containers are gone is found beside the ones docker still
-// names, which is where compose put it. A crawl of the machine finds the same
-// file and reads every other file on the disk to get there.
-func TestAProjectIsFoundBesideTheOnesDockerNames(t *testing.T) {
+// A stopped container names its project's files as exactly as a running
+// container does, so a stack that is merely down needs no directory read.
+func TestAStoppedContainerResolvesItsProjectToo(t *testing.T) {
 	dir := t.TempDir()
-	live := filepath.Join(dir, "webapp", "compose.yaml")
-	dead := filepath.Join(dir, "archive", "compose.yaml")
-	write(t, live)
-	write(t, dead)
-	r := &configRunner{byFile: map[string]string{
-		live: project("webapp"),
-		dead: project("archive"),
-	}}
+	file := filepath.Join(dir, "webapp", "compose.yaml")
+	write(t, file)
+	stopped := labelled("webapp", file)
+	stopped.State.Status = "exited"
+	r := &configRunner{byFile: map[string]string{file: project("webapp")}}
 
-	d := Discover(context.Background(), r, []dockercli.Container{labelled("webapp", live)},
-		[]string{"webapp", "archive"},
+	d := Discover(context.Background(), r, []dockercli.Container{stopped}, []string{"webapp"},
 		Options{Index: LoadIndex(filepath.Join(dir, "projects.json")), Now: seen})
 
-	assert.Equal(t, Alive, d.Resolve("archive"))
-}
-
-// A project found this way is remembered, so the next run costs nothing.
-func TestTheProbeFeedsTheIndex(t *testing.T) {
-	dir := t.TempDir()
-	live := filepath.Join(dir, "webapp", "compose.yaml")
-	dead := filepath.Join(dir, "archive", "compose.yaml")
-	write(t, live)
-	write(t, dead)
-	idx := LoadIndex(filepath.Join(dir, "projects.json"))
-	r := &configRunner{byFile: map[string]string{
-		live: project("webapp"),
-		dead: project("archive"),
-	}}
-
-	Discover(context.Background(), r, []dockercli.Container{labelled("webapp", live)},
-		[]string{"webapp", "archive"}, Options{Index: idx, Now: seen})
-
-	assert.Equal(t, []string{dead}, idx.Files("archive"))
-}
-
-// Compose names a project after its directory, lowercased and stripped, so the
-// directory rarely spells the name exactly.
-func TestAProjectMatchesItsDirectoryAsComposeNamesIt(t *testing.T) {
-	assert.Equal(t, "myapp", ProjectName("My.App"))
-	assert.Equal(t, "compose-manager", ProjectName("compose-manager"))
-	assert.Equal(t, "stack_one", ProjectName("Stack_One"))
-	assert.Equal(t, "app", ProjectName("__app"))
+	assert.Equal(t, Alive, d.Resolve("webapp"))
 }
 
 // Deleting the compose file is what retires a project. Docker named that file
@@ -210,25 +173,20 @@ func TestAnUnreadableComposeFileMeansUnknown(t *testing.T) {
 	assert.Equal(t, Unknown, d.Resolve("webapp"))
 }
 
-// A directory the probe cannot read is reported, so the reader knows the look
-// around was not the whole story.
-func TestAnUnreadableDirectoryIsReported(t *testing.T) {
+// A recorded path the tool may not stat reads as gone, and a project that
+// docker still names is resolved from the label rather than from that path.
+func TestAContainerLabelOutranksAnUnreadableRecordedPath(t *testing.T) {
 	dir := t.TempDir()
-	locked := filepath.Join(dir, "locked")
-	require.NoError(t, os.MkdirAll(filepath.Join(locked, "webapp"), 0o755))
-	require.NoError(t, os.Chmod(locked, 0o000))
-	t.Cleanup(func() { _ = os.Chmod(locked, 0o755) })
-	if _, err := os.ReadDir(locked); err == nil {
-		t.Skip("root reads a 0000 directory anyway")
-	}
+	live := filepath.Join(dir, "webapp", "compose.yaml")
+	write(t, live)
 	idx := LoadIndex(filepath.Join(dir, "projects.json"))
-	idx.Record("other", []string{filepath.Join(locked, "other", "compose.yaml")}, seen)
+	idx.Record("webapp", []string{filepath.Join(dir, "moved", "compose.yaml")}, seen)
+	r := &configRunner{byFile: map[string]string{live: project("webapp")}}
 
-	d := Discover(context.Background(), &configRunner{}, nil, []string{"webapp"},
-		Options{Index: idx, Now: seen})
+	d := Discover(context.Background(), r, []dockercli.Container{labelled("webapp", live)},
+		[]string{"webapp"}, Options{Index: idx, Now: seen})
 
-	require.NotEmpty(t, d.Failures)
-	assert.Contains(t, d.Failures[0], locked)
+	assert.Equal(t, Alive, d.Resolve("webapp"))
 }
 
 func TestTheIndexWarningReachesTheReport(t *testing.T) {

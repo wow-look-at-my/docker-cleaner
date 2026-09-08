@@ -2,7 +2,6 @@ package compose
 
 import (
 	"context"
-	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -17,7 +16,6 @@ import (
 const (
 	LabelProject     = "com.docker.compose.project"
 	LabelConfigFiles = "com.docker.compose.project.config_files"
-	LabelWorkingDir  = "com.docker.compose.project.working_dir"
 )
 
 // Discovery is the compose picture for a run.
@@ -43,55 +41,34 @@ type Options struct {
 
 // Discover resolves every compose project that could own a docker resource.
 //
-// Docker holds the answer already. Every container carries the files that
-// declare its project and the directory it came up in, whether it runs or not.
-// The index keeps those paths after `down` deletes the containers that carried
-// them. What neither explains is looked for beside the project directories
-// docker did name, because compose names a project after its own directory and
-// a machine keeps its stacks together.
+// Docker holds the answer, and nothing else is consulted. Every container
+// carries the files that declare its project, whether it runs or not, so a
+// project that has ever been started names its own files. The index keeps
+// those paths after `down` deletes the containers that carried them.
+//
+// A project neither explains has never been started while anything was
+// watching, so nothing is hunted for on the disk. It is unknown, and it keeps
+// what it claims.
 func Discover(ctx context.Context, r dockercli.Runner, containers []dockercli.Container, wanted []string, o Options) *Discovery {
 	idx := o.Index
 	d := &Discovery{Complete: true, Index: idx, unheard: set.New[string]()}
 
-	var parents []string
 	for _, c := range containers {
 		labels := c.Config.Labels
 		idx.Record(labels[LabelProject], splitList(labels[LabelConfigFiles]), o.Now)
-		if dir := labels[LabelWorkingDir]; dir != "" {
-			parents = append(parents, filepath.Dir(dir))
-		}
-	}
-	// A project the index knows sits beside the ones it does not.
-	for _, e := range idx.Projects {
-		for _, f := range e.Files {
-			parents = append(parents, filepath.Dir(filepath.Dir(f)))
-		}
 	}
 
 	files := map[string]bool{}
-	var unresolved []string
 	for _, project := range wanted {
 		found := idx.Files(project)
 		for _, f := range found {
 			files[f] = true
 		}
-		if len(found) == 0 {
-			unresolved = append(unresolved, project)
-			// Nothing has ever named a file for a project the index never
-			// recorded, so a missing file says nothing about it.
-			if !idx.Recorded(project) {
-				d.unheard.Add(project)
-			}
+		// Nothing has ever named a file for a project the index never
+		// recorded, so a missing file says nothing about it.
+		if len(found) == 0 && !idx.Recorded(project) {
+			d.unheard.Add(project)
 		}
-	}
-
-	if len(unresolved) > 0 {
-		o.Progress.Stage("looking beside the compose projects docker named")
-		res := probe(ctx, parents, unresolved)
-		for _, f := range res.Files {
-			files[f] = true
-		}
-		d.Failures = append(d.Failures, res.Failures...)
 	}
 
 	found := sortedKeys(files)
