@@ -38,7 +38,8 @@ tests:
 	  outputs:
 		stderr:
 			- "docker-cleaner: asking docker what it holds"
-			- "0% (0 of 7)"
+			- "0% (0 of 4)"
+			- "measuring volume "
 			- "docker-cleaner: looking for compose projects"
 			- "docker-cleaner: deciding what to remove"
 		!stderr:
@@ -55,7 +56,7 @@ tests:
 		stdout:
 			- "DRY RUN"
 		stderr:
-			- "measuring disk usage: 3 volumes, in a single docker pass ["
+			- "reading volumes 1 to 3 of 3 ["
 
 	- desc: progress never says nothing at all
 	  cmd: 'mkdir -p {outputs.empty}; B=$(cat {shared.bin}); FAKE_DOCKER_STATE={shared.state} $B --dry-run --progress never --docker-bin dats/fixtures/fake-docker --index {outputs.index.json} --mountinfo {inputs.mountinfo} --docker-root {outputs.dockerroot}'
@@ -81,8 +82,6 @@ tests:
 	  inputs:
 		files:
 			version.json: '{"Client":{"Version":"29.3.1"},"Server":{"Version":"29.3.1"}}'
-			system_df.txt: "TYPE   TOTAL   ACTIVE   SIZE   RECLAIMABLE\n"
-			system_df_v.json: '{"Volumes":[{"Name":"webapp_pgdata","UsageData":{"Size":52428800}}]}'
 			ps.txt: ""
 			image_ls.json: ""
 			network_ls.json: ""
@@ -126,7 +125,9 @@ tests:
 					- "network rm n1"
 		stdout:
 			- "APPLY"
-			- "AFTER"
+			- "FREED"
+		!stderr:
+			- "system df"
 
 	- desc: age reaches the selector, so a wider window keeps the recent container
 	  cmd: 'mkdir -p {outputs.empty}; B=$(cat {shared.bin}); FAKE_DOCKER_STATE={shared.state} $B --dry-run --age 90d --docker-bin dats/fixtures/fake-docker --index {outputs.index.json} --mountinfo {inputs.mountinfo} --docker-root {outputs.dockerroot}'
@@ -260,8 +261,6 @@ tests:
 	  inputs:
 		files:
 			version.json: '{"Client":{"Version":"29.3.1"},"Server":{"Version":"29.3.1"}}'
-			system_df.txt: "TYPE   TOTAL   ACTIVE   SIZE   RECLAIMABLE\n"
-			system_df_v.json: '{"Volumes":[{"Name":"webapp_pgdata","UsageData":{"Size":52428800}}]}'
 			ps.txt: ""
 			image_ls.json: ""
 			network_ls.json: ""
@@ -284,8 +283,6 @@ tests:
 	  inputs:
 		files:
 			version.json: '{"Client":{"Version":"29.3.1"},"Server":{"Version":"29.3.1"}}'
-			system_df.txt: "TYPE   TOTAL   ACTIVE   SIZE   RECLAIMABLE\n"
-			system_df_v.json: '{"Volumes":[{"Name":"webapp_pgdata","UsageData":{"Size":52428800}}]}'
 			ps.txt: ""
 			image_ls.json: ""
 			network_ls.json: ""
@@ -304,8 +301,6 @@ tests:
 	  inputs:
 		files:
 			version.json: '{"Client":{"Version":"29.3.1"},"Server":{"Version":"29.3.1"}}'
-			system_df.txt: "TYPE   TOTAL   ACTIVE   SIZE   RECLAIMABLE\n"
-			system_df_v.json: '{"Volumes":[{"Name":"webapp_pgdata","UsageData":{"Size":52428800}}]}'
 			ps.txt: ""
 			image_ls.json: ""
 			network_ls.json: ""
@@ -326,8 +321,6 @@ tests:
 	  inputs:
 		files:
 			version.json: '{"Client":{"Version":"29.3.1"},"Server":{"Version":"29.3.1"}}'
-			system_df.txt: "TYPE   TOTAL   ACTIVE   SIZE   RECLAIMABLE\n"
-			system_df_v.json: '{"Volumes":[{"Name":"webapp_pgdata","UsageData":{"Size":52428800}}]}'
 			ps.txt: ""
 			image_ls.json: ""
 			network_ls.json: ""

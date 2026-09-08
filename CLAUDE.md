@@ -31,8 +31,11 @@ One command that removes docker resources nothing will use again. Read the READM
 - Protection is per image ID, not per tag: if one tag of an id is kept, no `rmi` is emitted for its other tags.
 - Progress goes to stderr, never stdout. A `--json` document stays parseable while the run narrates itself.
 - The read lists before it inspects. That makes the step count real. The fraction is docker calls finished over docker calls to make. The line names the step that has waited longest, because that step holds the run up.
-- The inspects and the disk-usage pass run at the same time. `docker system df -v` walks every volume and outlasts the rest. In parallel the read costs the slowest call rather than the sum.
-- `docker system df` is never called for a table. The report renders BEFORE and AFTER from the disk-usage pass the run already made. A second call means a second walk of every volume.
+- `docker system df` is never called, in any form. It measures every volume in a pass that reports nothing until it ends. On a full host it outlasts `--timeout` and takes the run down with it. See `internal/dockercli/volumesize.go`.
+- Sizes come from what the read already fetched. Images carry their own size, and `container inspect --size` fills the writable layer in. A volume is measured by a walk of its `Mountpoint`. Those walks run several at a time, and each one reports.
+- No decision about what to remove reads a size. A volume nothing can read is reported as unmeasured. The plan is unaffected.
+- The inspects run at the same time as each other, so the read costs the slowest call rather than the sum.
+- FREED after an apply is the sizes the run already measured, never a second measurement.
 - Every phase that calls docker is counted: the read, the apply, and the measurement after an apply. A call names itself before it runs, never after it returns. A slow removal is visible while it happens.
 - `Stop` leaves the reporter usable, because the run still narrates after the report takes the screen. A later stage starts its draw loop again.
 - The apply log writes through `Reporter.Log`. A drawn line carries no newline, so a write straight to stdout lands on the end of it.

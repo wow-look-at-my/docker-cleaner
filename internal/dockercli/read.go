@@ -21,12 +21,10 @@ type listing struct {
 	builders   []Builder
 }
 
-// steps is how many calls the counted part of the read still has to make. The
-// trailing call is the disk-usage pass.
+// steps is how many calls the counted part of the read still has to make.
 func (l listing) steps() int {
 	return batches(len(l.containers)) + batches(len(l.images)) +
-		batches(len(l.volumes)) + batches(len(l.networks)) +
-		len(l.builders) + 1
+		batches(len(l.volumes)) + batches(len(l.networks))
 }
 
 // batches is how many inspect calls a set of ids takes.
@@ -96,22 +94,39 @@ func Read(ctx context.Context, r Runner, p *progress.Reporter) (Snapshot, error)
 		s.Networks, err = inspect[Network](ctx, r, "network", found.networks, p)
 		return err
 	})
-	go2(func() error {
-		// The daemon measures every volume in a single pass, so this step
-		// cannot be split. Naming the count says how big the job is.
-		did := p.Step("measuring disk usage: %s, in a single docker pass",
-			progress.Count("volume", "volumes", len(found.volumes)))
-		defer did()
-		return runJSON(ctx, r, &s.DiskUsage, "system", "df", "-v", "--format", "json")
-	})
 	wg.Wait()
 	if failed != nil {
 		return s, failed
 	}
-	s.BeforeText = Summary(s.DiskUsage)
 
-	s.Caches, s.CacheUnavailable = readCaches(ctx, r, p, found.builders, s.DiskUsage)
+	s.Caches, s.CacheUnavailable = readCaches(ctx, r, p, found.builders)
+	s.DiskUsage = measure(ctx, s, p)
 	return s, nil
+}
+
+// measure fills in the sizes the report shows. Nothing the selector decides
+// depends on a size, so a volume this cannot read is left out rather than
+// counted as empty.
+func measure(ctx context.Context, s Snapshot, p *progress.Reporter) DiskUsage {
+	var du DiskUsage
+	for _, i := range s.Images {
+		du.Images = append(du.Images, ImageUsage{ID: i.ID, Size: i.Size})
+		du.LayersSize += i.Size
+	}
+	for _, c := range s.Containers {
+		du.Containers = append(du.Containers, ContainerUsage{ID: c.ID, SizeRw: c.SizeRw})
+	}
+	for _, cache := range s.Caches {
+		du.BuildCache = append(du.BuildCache, cache.Records...)
+	}
+
+	p.Steps(len(s.Volumes))
+	sizes := MeasureVolumes(ctx, s.Volumes, p)
+	for _, v := range s.Volumes {
+		n, ok := sizes[v.Name]
+		du.Volumes = append(du.Volumes, VolumeUsage{Name: v.Name, Size: n, Measured: ok})
+	}
+	return du
 }
 
 // list enumerates what the machine holds. Every call here returns names only,
@@ -171,12 +186,19 @@ func listField(ctx context.Context, r Runner, field string, args ...string) ([]s
 // prune` act on a single builder, and a docker-container builder keeps its
 // cache in its own volume. A failure here is reported, not fatal: losing the
 // build cache must not block the rest of the run.
-func readCaches(ctx context.Context, r Runner, p *progress.Reporter, builders []Builder, du DiskUsage) ([]Cache, string) {
+func readCaches(ctx context.Context, r Runner, p *progress.Reporter, builders []Builder) ([]Cache, string) {
+	// With no builder named, the default builder still answers.
 	if len(builders) == 0 {
-		if len(du.BuildCache) > 0 {
-			return []Cache{{Builder: "", Records: du.BuildCache}}, ""
+		did := p.Step("reading the build cache")
+		recs, err := runNDJSON[CacheRecord](ctx, r, "buildx", "du", "--format", "json")
+		did()
+		if err != nil {
+			return nil, "cannot read build cache: " + err.Error()
 		}
-		return nil, ""
+		if len(recs) == 0 {
+			return nil, ""
+		}
+		return []Cache{{Builder: "", Records: recs}}, ""
 	}
 
 	var caches []Cache

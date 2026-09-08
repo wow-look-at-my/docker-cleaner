@@ -20,8 +20,8 @@ func TestReadParsesEveryDocument(t *testing.T) {
 
 	require.NotNil(t, s.Version.Server)
 	assert.Equal(t, "29.3.1", s.Version.Server.Version)
-	assert.Contains(t, s.BeforeText, "RECLAIMABLE")
-	assert.Equal(t, int64(1073741824), s.DiskUsage.LayersSize)
+	// Sizes come from the inspect output, never from a disk-usage pass.
+	assert.Equal(t, s.Images[0].Size+s.Images[1].Size, s.DiskUsage.LayersSize)
 
 	require.Len(t, s.Containers, 2)
 	assert.Equal(t, "/webapp-db-1", s.Containers[0].Name)
@@ -84,12 +84,15 @@ func TestEveryBuilderIsRead(t *testing.T) {
 	assert.Empty(t, s.CacheUnavailable)
 }
 
-// Without buildx the daemon still reports the default builder's cache through
-// system df, which is worth pruning even though the builder list is empty.
-func TestBuildxMissingFallsBackToSystemDF(t *testing.T) {
+// With no builder named, the default builder answers, and its cache is worth
+// pruning even though the builder list came back empty.
+func TestAnEmptyBuilderListStillReadsTheDefaultCache(t *testing.T) {
 	f := newFake(t)
 	f.override["buildx ls"] = func() ([]byte, []byte, error) {
 		return nil, []byte("docker: 'buildx' is not a docker command"), errors.New("exit status 125")
+	}
+	f.override["buildx du --format json"] = func() ([]byte, []byte, error) {
+		return fixture(t, "buildx_du_default.ndjson"), nil, nil
 	}
 
 	s, err := Read(context.Background(), f, nil)
@@ -97,7 +100,7 @@ func TestBuildxMissingFallsBackToSystemDF(t *testing.T) {
 
 	require.Len(t, s.Caches, 1)
 	assert.Empty(t, s.Caches[0].Builder)
-	assert.Equal(t, "df1", s.Caches[0].Records[0].ID)
+	assert.NotEmpty(t, s.Caches[0].Records)
 }
 
 // Build cache is a step of many. Losing it is reported, never fatal.
@@ -128,7 +131,7 @@ func TestUnreachableDaemonIsFatal(t *testing.T) {
 
 // A read that half-worked produces a confident, wrong plan, so it stops here.
 func TestFailedReadIsFatal(t *testing.T) {
-	for _, prefix := range []string{"ps -aq", "image ls", "volume ls", "network ls", "system df -v"} {
+	for _, prefix := range []string{"ps -aq", "image ls", "volume ls", "network ls"} {
 		f := newFake(t)
 		f.override[prefix] = func() ([]byte, []byte, error) {
 			return nil, []byte("Cannot connect to the Docker daemon"), errors.New("exit status 1")
@@ -200,8 +203,9 @@ func TestInspectBatchesWithoutLosingIDs(t *testing.T) {
 	require.Len(t, r.calls, 3)
 	var got []string
 	for _, c := range r.calls {
-		assert.Equal(t, []string{"container", "inspect"}, c[:2])
-		got = append(got, c[2:]...)
+		// --size is what fills SizeRw in, and it saves a pass of its own.
+		assert.Equal(t, []string{"container", "inspect", "--size"}, c[:3])
+		got = append(got, c[3:]...)
 	}
 	assert.Equal(t, ids, got)
 }

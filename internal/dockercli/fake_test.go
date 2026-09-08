@@ -71,10 +71,6 @@ func (f *fake) answer(args []string, joined string) ([]byte, []byte, error) {
 	switch {
 	case joined == "version --format json":
 		return fixture(f.t, "version.json"), nil, nil
-	case joined == "system df":
-		return fixture(f.t, "system_df.txt"), nil, nil
-	case joined == "system df -v --format json":
-		return fixture(f.t, "system_df_v.json"), nil, nil
 	case joined == "ps -aq --no-trunc":
 		return []byte("c0ffee1\nc0ffee2\n"), nil, nil
 	case joined == "image ls --no-trunc --format json":

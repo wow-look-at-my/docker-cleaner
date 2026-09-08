@@ -21,7 +21,7 @@ var predefinedNetworks = set.Of[string]("bridge", "host", "none")
 func (b *builder) selectVolumes() {
 	sizes := map[string]int64{}
 	for _, v := range b.snap.DiskUsage.Volumes {
-		sizes[v.Name] = v.UsageData.Size
+		sizes[v.Name] = v.Size
 	}
 
 	volumes := append([]dockercli.Volume(nil), b.snap.Volumes...)
