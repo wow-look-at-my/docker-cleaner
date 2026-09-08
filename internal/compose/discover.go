@@ -58,11 +58,14 @@ func Discover(ctx context.Context, r dockercli.Runner, containers []dockercli.Co
 		idx.Record(labels[LabelProject], splitList(labels[LabelConfigFiles]), o.Now)
 	}
 
-	files := map[string]bool{}
-	for _, project := range wanted {
+	// A project's files render as a set, never separately.
+	var sets [][]string
+	seen := set.New[string]()
+	for _, project := range sortedProjects(wanted) {
 		found := idx.Files(project)
-		for _, f := range found {
-			files[f] = true
+		if len(found) > 0 && !seen.Contains(project) {
+			seen.Add(project)
+			sets = append(sets, found)
 		}
 		// Nothing has ever named a file for a project the index never
 		// recorded, so a missing file says nothing about it.
@@ -71,11 +74,10 @@ func Discover(ctx context.Context, r dockercli.Runner, containers []dockercli.Co
 		}
 	}
 
-	found := sortedKeys(files)
-	if len(found) > 0 {
+	if len(sets) > 0 {
 		o.Progress.Stage("reading compose files")
 	}
-	d.Claims = Resolve(ctx, r, found, o.Progress)
+	d.Claims = Resolve(ctx, r, sets, o.Progress)
 	for project, p := range d.Claims.Projects {
 		idx.Record(project, p.Files, o.Now)
 	}
@@ -152,11 +154,10 @@ func splitList(v string) []string {
 	return out
 }
 
-func sortedKeys(m map[string]bool) []string {
-	out := make([]string, 0, len(m))
-	for k := range m {
-		out = append(out, k)
-	}
+// sortedProjects fixes the order the sets render in, so a repeated run reports
+// what the run before it reported.
+func sortedProjects(wanted []string) []string {
+	out := append([]string(nil), wanted...)
 	sort.Strings(out)
 	return out
 }

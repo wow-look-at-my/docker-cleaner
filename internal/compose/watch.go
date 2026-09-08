@@ -23,8 +23,8 @@ type event struct {
 //
 // It narrows a window and nothing more: an `up` followed by a `down` between
 // cleanup runs leaves no container to read labels from. It is never a
-// correctness dependency, because a project it misses is simply unresolved,
-// and an unresolved project falls through to the filesystem scan.
+// correctness dependency, because a project it misses is unresolved, and an
+// unresolved project keeps everything it claims.
 func Watch(ctx context.Context, dockerBin, indexPath string, log io.Writer) error {
 	cmd := exec.CommandContext(ctx, dockerBin,
 		"events", "--filter", "type=container", "--filter", "event=create", "--format", "json")

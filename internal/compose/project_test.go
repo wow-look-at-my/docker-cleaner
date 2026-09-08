@@ -8,9 +8,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// resolve renders each file as a project of its own, the ordinary shape.
 func resolve(t *testing.T, r *configRunner, files ...string) *Claims {
 	t.Helper()
-	return Resolve(context.Background(), r, files, nil)
+	var sets [][]string
+	for _, f := range files {
+		sets = append(sets, []string{f})
+	}
+	return Resolve(context.Background(), r, sets, nil)
 }
 
 // The docker name of a volume is not its compose key. Concatenating the project
@@ -143,11 +148,48 @@ func TestNoFilesMeansNoClaims(t *testing.T) {
 func TestRenderAsksComposeForJSON(t *testing.T) {
 	r := &recordingRunner{body: project("webapp")}
 
-	Resolve(context.Background(), r, []string{"/srv/app/compose.yaml"}, nil)
+	Resolve(context.Background(), r, [][]string{{"/srv/app/compose.yaml"}}, nil)
 
 	assert.Equal(t,
 		[]string{"compose", "-f", "/srv/app/compose.yaml", "config", "--format", "json"},
 		r.args)
+}
+
+// Compose merges an override onto its base file, and `-f` turns that automatic
+// merge off. So a project's files go into a single call, in order. Rendered
+// apart, a base file declares none of what its override adds, and the override
+// is not a project at all.
+func TestAProjectsFilesRenderInOneCall(t *testing.T) {
+	r := &recordingRunner{body: project("webapp")}
+
+	Resolve(context.Background(), r,
+		[][]string{{"/srv/app/docker-compose.yml", "/srv/app/docker-compose.override.yml"}}, nil)
+
+	assert.Equal(t, []string{
+		"compose",
+		"-f", "/srv/app/docker-compose.yml",
+		"-f", "/srv/app/docker-compose.override.yml",
+		"config", "--format", "json",
+	}, r.args)
+}
+
+// What the override adds is the project's too, so its volume is claimed and
+// never collected.
+func TestAnOverridesVolumeIsClaimed(t *testing.T) {
+	base := "/srv/app/docker-compose.yml"
+	over := "/srv/app/docker-compose.override.yml"
+	r := &configRunner{byFile: map[string]string{
+		base + "," + over: `{"name":"webapp","services":{"db":{"image":"postgres:16"}},` +
+			`"volumes":{"data":{},"extra":{}}}`,
+	}}
+
+	c := Resolve(context.Background(), r, [][]string{{base, over}}, nil)
+
+	project, ok := c.VolumeProject("webapp_extra")
+	require.True(t, ok, "a volume the override declares belongs to the project")
+	assert.Equal(t, "webapp", project)
+	require.Contains(t, c.Projects, "webapp")
+	assert.Equal(t, []string{base, over}, c.Projects["webapp"].Files, "compose's order is kept")
 }
 
 type recordingRunner struct {

@@ -11,7 +11,6 @@ import (
 	"github.com/wow-look-at-my/go-containers/set"
 	"os"
 	"path/filepath"
-	"sort"
 	"time"
 )
 
@@ -69,25 +68,34 @@ func LoadIndex(path string) *Index {
 	return idx
 }
 
-// Record adds files for a project, keeping the union. Paths accumulate because
-// a project can legitimately be described by several files.
+// Record adds files for a project, keeping the union.
+//
+// The caller passes the whole set compose named, in compose's order, and that
+// order decides what wins, so it leads. A path only the older record knew
+// follows it rather than being dropped. Ordering by anything else puts an
+// override ahead of the base file it overrides, and an index written that way
+// is repaired by the next run.
 func (i *Index) Record(project string, files []string, when time.Time) {
 	if project == "" || len(files) == 0 {
 		return
 	}
 	e := i.Projects[project]
-	have := set.New[string]()
-	for _, f := range e.Files {
-		have.Add(f)
-	}
+	named := set.New[string]()
+	var ordered []string
 	for _, f := range files {
-		if f == "" || have.Contains(f) {
+		if f == "" || named.Contains(f) {
 			continue
 		}
-		have.Add(f)
-		e.Files = append(e.Files, f)
+		named.Add(f)
+		ordered = append(ordered, f)
 	}
-	sort.Strings(e.Files)
+	for _, f := range e.Files {
+		if !named.Contains(f) {
+			named.Add(f)
+			ordered = append(ordered, f)
+		}
+	}
+	e.Files = ordered
 	e.Seen = when
 	i.Projects[project] = e
 }
