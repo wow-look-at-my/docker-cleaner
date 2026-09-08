@@ -32,11 +32,13 @@ type Doc struct {
 
 // Item is a planned removal.
 type Item struct {
-	ID       string     `json:"id"`
-	Name     string     `json:"name"`
-	Detail   string     `json:"detail,omitempty"`
-	Note     string     `json:"note,omitempty"`
-	Size     int64      `json:"size_bytes"`
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Detail string `json:"detail,omitempty"`
+	Note   string `json:"note,omitempty"`
+	Size   int64  `json:"size_bytes"`
+	// Measured false means size_bytes is a placeholder, not an empty resource.
+	Measured bool       `json:"size_measured"`
 	FreedBy  []string   `json:"freed_by,omitempty"`
 	Commands [][]string `json:"commands"`
 }
@@ -103,7 +105,7 @@ func Write(w io.Writer, d Doc) error {
 func items(targets []plan.Target) []Item {
 	out := make([]Item, 0, len(targets))
 	for _, t := range targets {
-		out = append(out, Item{t.ID, t.Name, t.Detail, t.Note, t.Size, t.FreedBy, t.Commands})
+		out = append(out, Item{t.ID, t.Name, t.Detail, t.Note, t.Size, !t.Unmeasured, t.FreedBy, t.Commands})
 	}
 	return out
 }

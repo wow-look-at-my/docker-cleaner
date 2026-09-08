@@ -16,11 +16,13 @@ import (
 // size at all, and the row says so rather than printing a size nobody measured.
 func Summary(du dockercli.DiskUsage, cacheUnavailable string) string {
 	rows := []struct {
-		label   string
-		total   int
-		size    int64
-		note    string
+		label string
+		total int
+		size  int64
+		note  string
+		// unknown hides the count too; unsized hides only the size.
 		unknown bool
+		unsized bool
 	}{
 		{label: "Images", total: len(du.Images)},
 		{label: "Containers", total: len(du.Containers)},
@@ -43,6 +45,7 @@ func Summary(du dockercli.DiskUsage, cacheUnavailable string) string {
 	}
 	if unmeasured > 0 {
 		rows[2].note = fmt.Sprintf("+%d unmeasured", unmeasured)
+		rows[2].unsized = unmeasured == len(du.Volumes)
 	}
 	for _, b := range du.BuildCache {
 		rows[3].size += b.Size
@@ -56,8 +59,11 @@ func Summary(du dockercli.DiskUsage, cacheUnavailable string) string {
 	fmt.Fprintf(&b, "%-15s %8s %12s  %s\n", "TYPE", "TOTAL", "SIZE", "")
 	for _, r := range rows {
 		total, size := fmt.Sprintf("%d", r.total), Bytes(r.size)
-		if r.unknown {
+		switch {
+		case r.unknown:
 			total, size = "?", "?"
+		case r.unsized:
+			size = "?"
 		}
 		fmt.Fprintf(&b, "%-15s %8s %12s  %s\n", r.label, total, size, r.note)
 	}
