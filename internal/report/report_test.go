@@ -113,7 +113,7 @@ func TestAnUnresolvedProjectIsAnnouncedAndItsFailuresListed(t *testing.T) {
 	out := string(render(t, p, "", true, false))
 
 	assert.Contains(t, out, "NOT FULLY RESOLVED")
-	assert.Contains(t, out, "COULD NOT SEARCH: /srv: permission denied")
+	assert.Contains(t, out, "COULD NOT READ: /srv: permission denied")
 	assert.Contains(t, out, "WARNING: cannot write the project index")
 }
 

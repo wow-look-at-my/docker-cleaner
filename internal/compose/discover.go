@@ -107,7 +107,7 @@ func Discover(ctx context.Context, r dockercli.Runner, containers []dockercli.Co
 	// no compose file names is not deleted. This covers the render.
 	if ctx.Err() != nil && d.Complete {
 		d.Complete = false
-		d.Failures = append(d.Failures, "the compose search ran out of time before every file was read")
+		d.Failures = append(d.Failures, "the run ran out of time before every compose file was read")
 	}
 	if len(d.Claims.Unreadable) > 0 {
 		d.Complete = false

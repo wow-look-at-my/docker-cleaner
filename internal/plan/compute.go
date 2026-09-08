@@ -146,5 +146,5 @@ func (b *builder) composeUnresolvedImage(dockercli.Image) (Reason, string, bool)
 	if b.disco == nil || b.disco.Complete {
 		return "", "", false
 	}
-	return ReasonScanIncomplete, "the compose search was incomplete", true
+	return ReasonScanIncomplete, "a compose file went unread", true
 }

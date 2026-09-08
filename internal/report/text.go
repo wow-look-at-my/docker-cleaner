@@ -59,7 +59,7 @@ KEPT
 {{- end}}
 {{- end}}
 {{- range .Plan.ComposeFailures}}
-COULD NOT SEARCH: {{.}}
+COULD NOT READ: {{.}}
 {{- end}}
 {{- range .Plan.Warnings}}
 WARNING: {{.}}
