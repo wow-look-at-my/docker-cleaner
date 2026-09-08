@@ -21,10 +21,27 @@ type listing struct {
 	builders   []Builder
 }
 
-// steps is how many calls the counted part of the read still has to make.
+// steps is how many calls the counted part of the read still has to make. It
+// covers the cache reads too, because a step nothing counted takes the fraction
+// past its own end.
 func (l listing) steps() int {
 	return batches(len(l.containers)) + batches(len(l.images)) +
-		batches(len(l.volumes)) + batches(len(l.networks))
+		batches(len(l.volumes)) + batches(len(l.networks)) + cacheSteps(l.builders)
+}
+
+// cacheSteps is how many `buildx du` calls the builders take. With no builder
+// named, the default builder still answers a call of its own.
+func cacheSteps(builders []Builder) int {
+	if len(builders) == 0 {
+		return 1
+	}
+	n := 0
+	for _, b := range builders {
+		if b.Name != "" {
+			n++
+		}
+	}
+	return n
 }
 
 // batches is how many inspect calls a set of ids takes.

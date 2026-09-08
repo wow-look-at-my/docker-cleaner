@@ -210,6 +210,21 @@ func TestInspectBatchesWithoutLosingIDs(t *testing.T) {
 	assert.Equal(t, ids, got)
 }
 
+// The denominator has to hold every call the read still makes. A cache read
+// nothing counted takes the fraction past its own end.
+func TestTheStepCountHoldsTheCacheReads(t *testing.T) {
+	t.Parallel()
+
+	two := listing{
+		containers: []string{"c1"},
+		builders:   []Builder{{Name: "default"}, {Name: "ci"}},
+	}
+	assert.Equal(t, 3, two.steps())
+
+	// With no builder named, the default builder still answers a call.
+	assert.Equal(t, 2, listing{containers: []string{"c1"}}.steps())
+}
+
 // docker treats a bare inspect as a usage error, so an empty list must not
 // reach it at all.
 func TestEmptyListIssuesNoInspect(t *testing.T) {
