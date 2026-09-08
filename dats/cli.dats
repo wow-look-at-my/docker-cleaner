@@ -37,14 +37,25 @@ tests:
 			mountinfo: "27 1 259:2 / {outputs.empty} rw,relatime shared:1 - ext4 /dev/sda1 rw\n"
 	  outputs:
 		stderr:
-			- "docker-cleaner: asking docker for its version"
-			- "docker-cleaner: reading containers"
+			- "docker-cleaner: asking docker what it holds"
+			- "0% (0 of 7)"
 			- "docker-cleaner: looking for compose projects"
 			- "docker-cleaner: deciding what to remove"
 		!stderr:
 			- "["
 		!stdout:
 			- "docker-cleaner: reading containers"
+
+	- desc: a docker call that takes its time keeps saying so, instead of looking wedged
+	  cmd: 'mkdir -p {outputs.empty}; B=$(cat {shared.bin}); FAKE_DOCKER_STATE={shared.state} FAKE_DOCKER_STALL=7 $B --dry-run --docker-bin dats/fixtures/fake-docker --index {outputs.index.json} --mountinfo {inputs.mountinfo} --docker-root {outputs.dockerroot}'
+	  inputs:
+		files:
+			mountinfo: "27 1 259:2 / {outputs.empty} rw,relatime shared:1 - ext4 /dev/sda1 rw\n"
+	  outputs:
+		stdout:
+			- "DRY RUN"
+		stderr:
+			- "measuring disk usage: 3 volumes, in a single docker pass ["
 
 	- desc: progress never says nothing at all
 	  cmd: 'mkdir -p {outputs.empty}; B=$(cat {shared.bin}); FAKE_DOCKER_STATE={shared.state} $B --dry-run --progress never --docker-bin dats/fixtures/fake-docker --index {outputs.index.json} --mountinfo {inputs.mountinfo} --docker-root {outputs.dockerroot}'

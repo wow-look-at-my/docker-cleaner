@@ -98,6 +98,7 @@ type DiskUsage struct {
 		ID         string `json:"Id"`
 		Size       int64  `json:"Size"`
 		SharedSize int64  `json:"SharedSize"`
+		Containers int    `json:"Containers"` // holders, negative when uncounted
 	} `json:"Images"`
 	Containers []struct {
 		ID     string `json:"Id"`
@@ -106,7 +107,8 @@ type DiskUsage struct {
 	Volumes []struct {
 		Name      string `json:"Name"`
 		UsageData struct {
-			Size int64 `json:"Size"`
+			Size     int64 `json:"Size"`
+			RefCount int   `json:"RefCount"` // containers holding it
 		} `json:"UsageData"`
 	} `json:"Volumes"`
 	BuildCache []CacheRecord `json:"BuildCache"`

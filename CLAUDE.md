@@ -6,13 +6,13 @@ One command that removes docker resources nothing will use again. Read the READM
 
 - `go-toolchain` bare in the repository root. Never a bare `go` command, and never pipe or redirect its output.
 - `UPDATE_GOLDEN=1 go-toolchain` re-blesses the report goldens and `docs/cmdline_args.txt`.
-- The `dats/` suite needs bubblewrap or docker for its sandbox; CI installs bubblewrap.
+- The `dats/` suite needs bubblewrap or docker for its sandbox. CI installs bubblewrap.
 
 ## Layout
 
 - `main.go`, `cmd/` -- cobra surface. `root.go` is the cleanup, `watch.go` the events recorder, `inject.go` the runner seam, `docs.go` the generated help dump.
-- `internal/dockercli/` -- every docker read and write. `read.go` gathers a Snapshot, `apply.go` turns one target into one argv.
-- `internal/compose/` -- would a project still on disk attach this? `index.go` remembers paths, `scan.go` searches for them, `project.go` renders a compose file, `discover.go` decides alive, deleted or unknown.
+- `internal/dockercli/` -- every docker read and write. `read.go` gathers a Snapshot, `apply.go` turns one target into one argv, `summary.go` renders the usage table.
+- `internal/compose/` -- will a project still on disk attach this? `index.go` remembers paths, `scan.go` searches for them, `project.go` renders a compose file, `discover.go` decides alive, deleted or unknown.
 - `internal/plan/` -- `Compute` is pure: snapshot plus options plus one clock reading gives the plan. Nothing else decides what goes.
 - `internal/report/` -- the terminal report (`text.go`) and the JSON document (`json.go`).
 - `internal/progress/` -- says what the run is doing, on stderr, while it does it. A nil `*Reporter` is a working no-op.
@@ -25,10 +25,16 @@ One command that removes docker resources nothing will use again. Read the READM
 - Never `docker rm -v`, never `docker rmi -f`, never `docker image ls -a`. `--force` is right only on `buildx prune`, where it means "do not ask".
 - A read that fails is fatal (exit 3): a partial read makes a confident, wrong plan. An apply failure is reported and the run continues (exit 1).
 - "No compose file found" acts only when the search was exhaustive. Any unreadable directory or unwalkable mount keeps every unresolved project.
-- The index is a cache of a fact, never the fact: a recorded path is `stat`ed before it is believed, and a damaged index is discarded rather than half-parsed.
+- The index is a cache of a fact, never the fact. A recorded path is `stat`ed before it is believed. A damaged index is discarded rather than half-parsed.
 - Zero `FinishedAt` parses to year one and beats every cutoff, so `dockercli.ParseTime` rejects it. See the trap list in the plan.
 - `buildx prune` acts on one builder, so every builder from `buildx ls` gets its own command. Its `until=` takes a Go duration: `168h`, never `7d`.
 - Protection is per image ID, not per tag: if one tag of an id is kept, no `rmi` is emitted for its other tags.
 - Progress goes to stderr, never stdout. A `--json` document stays parseable while the run narrates itself.
+- The read lists before it inspects. That makes the step count real. The fraction is docker calls finished over docker calls to make. The line names the step that has waited longest, because that step holds the run up.
+- The inspects and the disk-usage pass run at the same time. `docker system df -v` walks every volume and outlasts the rest. In parallel the read costs the slowest call rather than the sum.
+- `docker system df` is never called for a table. The report renders BEFORE and AFTER from the disk-usage pass the run already made. A second call means a second walk of every volume.
+- Every phase that calls docker is counted: the read, the apply, and the measurement after an apply. A call names itself before it runs, never after it returns. A slow removal is visible while it happens.
+- `Stop` leaves the reporter usable, because the run still narrates after the report takes the screen. A later stage starts its draw loop again.
+- The apply log writes through `Reporter.Log`. A drawn line carries no newline, so a write straight to stdout lands on the end of it.
 - The compose search is bounded by `--scan-timeout` and by a depth limit, and it skips a directory it has already read, by device and inode. Each of those exits is a `Failure`, which marks the search incomplete and keeps every unresolved project.
 - A file the render never reached is `Unreadable`, never a project that declares nothing. The second reading retires a live project.

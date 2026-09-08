@@ -5,6 +5,7 @@ package run
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -81,10 +82,17 @@ func Do(ctx context.Context, c Config) int {
 	}
 
 	_, failed := apply(ctx, c, p, c.Stdout)
-	after, _, _ := c.Runner.Run(ctx, "system", "df")
-	if len(after) > 0 {
+
+	// Measuring again walks every volume, the slowest thing docker does.
+	c.Progress.Stage("measuring disk usage again")
+	out, _, err := c.Runner.Run(ctx, "system", "df", "-v", "--format", "json")
+	// The line goes before the table does, so the report keeps the screen.
+	c.Progress.Stop()
+
+	var after dockercli.DiskUsage
+	if err == nil && json.Unmarshal(out, &after) == nil {
 		fmt.Fprintln(c.Stdout, "\nAFTER")
-		fmt.Fprintln(c.Stdout, strings.TrimRight(string(after), "\n"))
+		fmt.Fprintln(c.Stdout, strings.TrimRight(dockercli.Summary(after), "\n"))
 	}
 	if failed > 0 {
 		return ExitApplyFailed
@@ -135,6 +143,8 @@ func discover(ctx context.Context, c Config, snap dockercli.Snapshot) *compose.D
 // world that changed under us is normal, not exceptional.
 func apply(ctx context.Context, c Config, p plan.Plan, log io.Writer) ([]report.Operation, int) {
 	fmt.Fprintln(log, "APPLY")
+	c.Progress.Steps(commandCount(p))
+	defer c.Progress.Stop()
 	notRemoved := map[string]bool{}
 	var ops []report.Operation
 	failures := 0
@@ -152,7 +162,7 @@ func apply(ctx context.Context, c Config, p plan.Plan, log io.Writer) ([]report.
 	rest := append(append(append([]plan.Target{}, p.Images...), p.Volumes...), p.Networks...)
 	for _, t := range rest {
 		if blocked, by := blockedBy(t, notRemoved); blocked {
-			fmt.Fprintf(log, "  skipped  %s: %s was not removed\n", t.Name, by)
+			c.Progress.Log(log, "  skipped  %s: %s was not removed\n", t.Name, by)
 			continue
 		}
 		done, ok := runTarget(ctx, c, t, log)
@@ -172,6 +182,17 @@ func apply(ctx context.Context, c Config, p plan.Plan, log io.Writer) ([]report.
 	return ops, failures
 }
 
+// commandCount is how many docker calls the apply will make.
+func commandCount(p plan.Plan) int {
+	n := len(p.Caches)
+	for _, group := range [][]plan.Target{p.Containers, p.Images, p.Volumes, p.Networks} {
+		for _, t := range group {
+			n += len(t.Commands)
+		}
+	}
+	return n
+}
+
 func runTarget(ctx context.Context, c Config, t plan.Target, log io.Writer) ([]report.Operation, bool) {
 	ok := true
 	var ops []report.Operation
@@ -185,12 +206,18 @@ func runTarget(ctx context.Context, c Config, t plan.Target, log io.Writer) ([]r
 	return ops, ok
 }
 
+// doOne names the removal before it runs it. A large image or a build cache
+// takes its time, and the log speaks only after the call comes back.
 func doOne(ctx context.Context, c Config, args []string, log io.Writer) report.Operation {
-	if err := dockercli.Do(ctx, c.Runner, args); err != nil {
-		fmt.Fprintf(log, "  FAILED   docker %s: %v\n", strings.Join(args, " "), err)
+	did := c.Progress.Step("docker %s", strings.Join(args, " "))
+	err := dockercli.Do(ctx, c.Runner, args)
+	did()
+
+	if err != nil {
+		c.Progress.Log(log, "  FAILED   docker %s: %v\n", strings.Join(args, " "), err)
 		return report.Operation{Argv: args, OK: false, Err: err.Error()}
 	}
-	fmt.Fprintf(log, "  ok       docker %s\n", strings.Join(args, " "))
+	c.Progress.Log(log, "  ok       docker %s\n", strings.Join(args, " "))
 	return report.Operation{Argv: args, OK: true}
 }
 

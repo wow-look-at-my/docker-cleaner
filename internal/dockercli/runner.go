@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -42,6 +43,11 @@ func (e *Exec) Run(ctx context.Context, args ...string) ([]byte, []byte, error) 
 	cmd.Stdout = &out
 	cmd.Stderr = &errb
 	err := cmd.Run()
+	// A killed child reports "signal: killed", which names neither the clock
+	// that killed it nor the flag that moves that clock.
+	if err != nil && errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		err = fmt.Errorf("gave up after %s: raise --timeout", e.Timeout)
+	}
 	return out.Bytes(), errb.Bytes(), err
 }
 
@@ -129,11 +135,10 @@ func inspect[T any](ctx context.Context, r Runner, kind string, ids []string, p 
 	var all []T
 	for start := 0; start < len(ids); start += inspectChunk {
 		end := min(start+inspectChunk, len(ids))
-		if len(ids) > inspectChunk {
-			p.Stage("inspecting %ss (%d of %d)", kind, end, len(ids))
-		}
+		did := p.Step("reading %ss %d to %d of %d", kind, start+1, end, len(ids))
 		args := append([]string{kind, "inspect"}, ids[start:end]...)
 		out, errb, err := r.Run(ctx, args...)
+		did()
 		if err != nil && !missingObject(errb) {
 			return nil, fmt.Errorf("docker %s inspect: %w: %s", kind, err, strings.TrimSpace(string(errb)))
 		}
