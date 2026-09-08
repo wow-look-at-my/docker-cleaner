@@ -126,6 +126,48 @@ func TestBuildCachePrintsTheCommandItWillRun(t *testing.T) {
 	assert.Contains(t, out, "docker buildx prune --builder ci-builder --force --filter until=168h")
 }
 
+// A heading adds up the rows under it. Rows that read "?" must not add up to a
+// number, because that number says the run measured them and found nothing.
+func TestAHeadingOverUnmeasuredRowsCarriesNoSize(t *testing.T) {
+	p := plan.Plan{
+		Age: 30 * 24 * time.Hour, BuildCacheAge: 7 * 24 * time.Hour,
+		Cutoff: now.Add(-30 * 24 * time.Hour), CacheCutoff: now.Add(-7 * 24 * time.Hour),
+		Volumes: []plan.Target{
+			{Kind: plan.KindVolume, ID: "a", Name: "a", Unmeasured: true},
+			{Kind: plan.KindVolume, ID: "b", Name: "b", Unmeasured: true},
+		},
+		ComposeComplete: true,
+	}
+
+	out := string(render(t, p, "", true, false))
+
+	assert.Contains(t, out, "VOLUMES TO REMOVE  (2, ?)")
+	assert.Contains(t, out, "TOTAL  ? reclaimable")
+}
+
+// A mix is a floor, never a total: the measured part is real and the rest is
+// missing, so the figure can only be smaller than the truth.
+func TestAHeadingOverSomeUnmeasuredRowsReadsAsAFloor(t *testing.T) {
+	p := fixedPlan()
+	p.Volumes = append(p.Volumes, plan.Target{
+		Kind: plan.KindVolume, ID: "dark", Name: "dark", Unmeasured: true,
+		Commands: [][]string{{"volume", "rm", "dark"}},
+	})
+
+	out := string(render(t, p, "", true, false))
+
+	assert.Contains(t, out, "VOLUMES TO REMOVE  (2, at least 1.0kB)")
+	assert.Contains(t, out, "TOTAL  at least ")
+}
+
+// Nothing unmeasured means the totals are exact, so they say so plainly.
+func TestHeadingsOverMeasuredRowsStayExact(t *testing.T) {
+	out := string(render(t, fixedPlan(), "", true, false))
+
+	assert.Contains(t, out, "VOLUMES TO REMOVE  (1, 1.0kB)")
+	assert.NotContains(t, out, "at least")
+}
+
 func TestBytesMatchesDockersUnits(t *testing.T) {
 	for n, want := range map[int64]string{
 		0: "0B", 999: "999B", 1000: "1.0kB", 1500: "1.5kB",

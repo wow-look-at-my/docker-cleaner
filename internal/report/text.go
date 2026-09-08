@@ -17,6 +17,7 @@ var doc = template.Must(template.New("report").Funcs(template.FuncMap{
 	"age":         plan.HumanAge,
 	"join":        strings.Join,
 	"total":       totalSize,
+	"reclaimable": reclaimable,
 	"argv":        func(a []string) string { return "docker " + strings.Join(a, " ") },
 	"trim":        func(s string) string { return strings.TrimRight(s, "\n") },
 	"cutoff":      func(p plan.Plan) string { return p.Cutoff.UTC().Format("2006-01-02 15:04 MST") },
@@ -33,7 +34,7 @@ BEFORE
 {{- end}}
 {{- range .Sections}}{{if .Targets}}
 
-{{.Title}}  ({{len .Targets}}, {{bytes (total .Targets)}})
+{{.Title}}  ({{len .Targets}}, {{total .Targets}})
 {{- range .Targets}}
   {{printf "%-40s" .Name}} {{printf "%10s" (size .)}}  {{.Detail}}
   {{- if .FreedBy}}
@@ -70,7 +71,7 @@ WARNING: {{.}}
 Nothing to remove.
 {{- else}}
 
-TOTAL  {{bytes .Plan.Reclaimable}} reclaimable
+TOTAL  {{reclaimable .Plan}} reclaimable
 {{- if .DryRun}}
 
 Dry run: nothing was removed.
@@ -157,12 +158,34 @@ func keptLines(p plan.Plan, showKept bool) []string {
 	return append(out, "(--show-kept lists all "+itoa(len(p.Kept))+")")
 }
 
-func totalSize(targets []plan.Target) int64 {
+// totalSize adds the rows under a heading, so the heading never claims more
+// than the run read.
+func totalSize(targets []plan.Target) string {
 	var n int64
+	missing := 0
 	for _, t := range targets {
 		n += t.Size
+		if t.Unmeasured {
+			missing++
+		}
 	}
-	return n
+	return Floor(n, missing, len(targets))
+}
+
+// reclaimable is the whole plan under the same rule as a heading.
+func reclaimable(p plan.Plan) string {
+	targets := p.Targets()
+	missing := 0
+	for _, t := range targets {
+		if t.Unmeasured {
+			missing++
+		}
+	}
+	n := p.Reclaimable()
+	if len(p.Caches) > 0 {
+		return Floor(n, missing, len(targets)+len(p.Caches))
+	}
+	return Floor(n, missing, len(targets))
 }
 
 // targetSize keeps a size nobody measured from reading as an empty resource.

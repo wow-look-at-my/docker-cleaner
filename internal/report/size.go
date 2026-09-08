@@ -17,3 +17,15 @@ func Bytes(n int64) string {
 	}
 	return fmt.Sprintf("%.1f%cB", float64(n)/float64(div), "kMGTPE"[exp])
 }
+
+// Floor renders a sum whose members were not all measured. A sum nothing
+// measured reads as "?", and a partial sum says it is a floor.
+func Floor(sum int64, missing, total int) string {
+	switch {
+	case total > 0 && missing == total:
+		return "?"
+	case missing > 0:
+		return "at least " + Bytes(sum)
+	}
+	return Bytes(sum)
+}
