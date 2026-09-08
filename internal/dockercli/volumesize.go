@@ -96,7 +96,7 @@ func treeSize(ctx context.Context, root string) (int64, bool) {
 			}
 			return err
 		}
-		total += info.Size()
+		total += onDisk(info)
 		return nil
 	})
 	if err != nil {

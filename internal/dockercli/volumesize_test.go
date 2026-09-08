@@ -19,18 +19,36 @@ func mountWith(t *testing.T, name string, bytes int) Volume {
 	return Volume{Name: name, Mountpoint: dir}
 }
 
-// The size of a volume is the bytes under its mountpoint, counted through every
-// directory below it.
+// The size of a volume is what its files occupy under the mountpoint, counted
+// through every directory below it.
 func TestAVolumeIsMeasuredThroughItsWholeTree(t *testing.T) {
 	t.Parallel()
 
 	sizes := MeasureVolumes(context.Background(), []Volume{
 		mountWith(t, "small", 128),
-		mountWith(t, "large", 4096),
+		mountWith(t, "large", 1<<20),
 	}, nil)
 
-	assert.Equal(t, int64(128), sizes["small"])
-	assert.Equal(t, int64(4096), sizes["large"])
+	assert.GreaterOrEqual(t, sizes["small"], int64(128))
+	assert.GreaterOrEqual(t, sizes["large"], int64(1<<20))
+	assert.Less(t, sizes["small"], sizes["large"])
+}
+
+// Removing a volume gives back the blocks its files occupy, not the lengths
+// they report. A sparse file reports far more than it holds.
+func TestASparseFileIsMeasuredByWhatItOccupies(t *testing.T) {
+	t.Parallel()
+
+	dir := filepath.Join(t.TempDir(), "sparse", "_data")
+	require.NoError(t, os.MkdirAll(dir, 0o755))
+	f, err := os.Create(filepath.Join(dir, "hole"))
+	require.NoError(t, err)
+	require.NoError(t, f.Truncate(1<<30))
+	require.NoError(t, f.Close())
+
+	sizes := MeasureVolumes(context.Background(), []Volume{{Name: "sparse", Mountpoint: dir}}, nil)
+
+	assert.Less(t, sizes["sparse"], int64(1<<20), "a hole occupies nothing")
 }
 
 // A volume nothing can read is absent from the result. Reporting it as empty
