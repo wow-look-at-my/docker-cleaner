@@ -52,7 +52,7 @@ const (
 	ReasonConfigOnly      Reason = "a config-only network"
 	ReasonNonLocalDriver  Reason = "not the local driver"
 	ReasonClaimedByCompos Reason = "claimed by a compose project still on disk"
-	ReasonScanIncomplete  Reason = "its compose project is unresolved and the search was incomplete"
+	ReasonScanIncomplete  Reason = "nothing has named a compose file for its project"
 	ReasonComposeBadFile  Reason = "its compose file could not be read"
 )
 
@@ -116,8 +116,6 @@ type Plan struct {
 	// ComposeComplete false changes what "not found" means, so it is reported.
 	ComposeComplete bool
 	ComposeFailures []string
-	SkippedMounts   []string
-	DirsWalked      int
 	Warnings        []string
 }
 

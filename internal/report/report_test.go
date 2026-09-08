@@ -58,7 +58,6 @@ func fixedPlan() plan.Plan {
 			{Kind: plan.KindVolume, Name: "webapp_pgdata", Reason: plan.ReasonClaimedByCompos, Detail: "webapp"},
 		},
 		ComposeComplete: true,
-		DirsWalked:      0,
 	}
 }
 
@@ -103,22 +102,19 @@ func TestNothingToRemoveReport(t *testing.T) {
 	golden(t, "empty.golden", render(t, p, "", false, false))
 }
 
-// An incomplete search changes what "not found" means, so the report says so
+// An unresolved project changes what "not found" means, so the report says so
 // in its header rather than burying it.
-func TestIncompleteSearchIsAnnouncedAndItsFailuresListed(t *testing.T) {
+func TestAnUnresolvedProjectIsAnnouncedAndItsFailuresListed(t *testing.T) {
 	p := fixedPlan()
 	p.ComposeComplete = false
 	p.ComposeFailures = []string{"/srv: permission denied"}
-	p.SkippedMounts = []string{"/proc: kernel filesystem (proc)"}
 	p.Warnings = []string{"cannot write the project index under /var/lib/docker-cleaner"}
-	p.DirsWalked = 12043
 
 	out := string(render(t, p, "", true, false))
 
-	assert.Contains(t, out, "SEARCH INCOMPLETE")
-	assert.Contains(t, out, "COULD NOT SEARCH: /srv: permission denied")
+	assert.Contains(t, out, "NOT FULLY RESOLVED")
+	assert.Contains(t, out, "COULD NOT READ: /srv: permission denied")
 	assert.Contains(t, out, "WARNING: cannot write the project index")
-	assert.Contains(t, out, "12043 directories walked")
 }
 
 // The exact prune argv is printed because it is the command whose effect

@@ -105,6 +105,12 @@ func (i *Index) Files(project string) []string {
 	return live
 }
 
+// Recorded reports whether the index holds a path for a project, existing or
+// not. A recorded path that is gone retires the project.
+func (i *Index) Recorded(project string) bool {
+	return len(i.Projects[project].Files) > 0
+}
+
 // Forget drops a project whose files have all disappeared.
 func (i *Index) Forget(project string) { delete(i.Projects, project) }
 

@@ -95,22 +95,15 @@ func (d *docker) mutations() []string {
 	return out
 }
 
-// config builds a run whose compose search is exhaustive and cheap: a single mount,
-// an empty directory, so nothing on disk claims anything.
+// config builds a run against a fresh index, so nothing on disk claims anything.
 func config(t *testing.T, d *docker) (Config, *bytes.Buffer, *bytes.Buffer) {
 	t.Helper()
 	dir := t.TempDir()
-	empty := t.TempDir()
-	mountinfo := filepath.Join(dir, "mountinfo")
-	require.NoError(t, os.WriteFile(mountinfo,
-		[]byte("27 1 259:2 / "+empty+" rw,relatime shared:1 - ext4 /dev/nvme0n1p2 rw\n"), 0o644))
 
 	var stdout, stderr bytes.Buffer
 	return Config{
 		Options:     plan.Options{Age: 30 * 24 * time.Hour, BuildCacheAge: 7 * 24 * time.Hour},
 		IndexPath:   filepath.Join(dir, "projects.json"),
-		MountInfo:   mountinfo,
-		DockerRoot:  "/var/lib/docker",
 		Runner:      d,
 		Stdout:      &stdout,
 		Stderr:      &stderr,
@@ -280,19 +273,17 @@ func TestJSONApplyRecordsWhatRanAndKeepsStdoutClean(t *testing.T) {
 	assert.Contains(t, stderr.String(), "APPLY")
 }
 
-// Without a mount table the search cannot be exhaustive, and saying otherwise
-// would let "no compose file found" mean "that project was deleted".
-func TestAMissingMountTableMakesTheSearchIncomplete(t *testing.T) {
+// A project no container names and the index never recorded is kept, because
+// nothing ever said where its compose file lives.
+func TestAProjectNothingNamedKeepsItsVolume(t *testing.T) {
 	d := newDocker()
 	c, stdout, _ := config(t, d)
-	c.MountInfo = filepath.Join(t.TempDir(), "absent")
 	c.DryRun = true
 
 	code := Do(context.Background(), c)
 
 	assert.Equal(t, ExitOK, code)
-	assert.Contains(t, stdout.String(), "SEARCH INCOMPLETE")
-	assert.Contains(t, stdout.String(), "COULD NOT SEARCH: cannot read")
+	assert.NotContains(t, stdout.String(), "orphan_data")
 }
 
 // A machine with nothing to clean says so and asks nothing.
@@ -340,30 +331,33 @@ func TestTheRunPersistsWhatItLearned(t *testing.T) {
 	assert.Contains(t, string(body), file)
 }
 
-// A project the index cannot explain is worth a walk; a project it can is not. This
-// is the whole speed claim, and it is asserted on the directory count.
-func TestAKnownProjectCostsNoWalk(t *testing.T) {
-	dir := t.TempDir()
-	file := filepath.Join(dir, "compose.yaml")
-	require.NoError(t, os.WriteFile(file, []byte("services: {}\n"), 0o644))
+// A stopped container names its project's file, so the stack it belongs to
+// keeps its volume without anything reading a directory.
+func TestAStoppedStackKeepsItsVolumeFromItsOwnLabel(t *testing.T) {
+	root := t.TempDir()
+	live := filepath.Join(root, "webapp", "compose.yaml")
+	require.NoError(t, os.MkdirAll(filepath.Dir(live), 0o755))
+	require.NoError(t, os.WriteFile(live, []byte("services: {}\n"), 0o644))
 
 	d := newDocker()
-	d.reads["volume ls --format json"] = `{"Name":"webapp_pgdata"}` + "\n"
-	d.reads["volume inspect webapp_pgdata"] = `[{"Name":"webapp_pgdata","Driver":"local","Scope":"local",` +
+	d.reads["container inspect --size c1"] = inspectDoc(map[string]any{
+		"Id": "c1", "Name": "/webapp-db-1", "Image": "sha256:i1",
+		"Created": ago(400 * 24 * time.Hour),
+		"State":   map[string]any{"Status": "exited", "FinishedAt": ago(400 * 24 * time.Hour)},
+		"Config": map[string]any{"Image": "myapp:v1", "Labels": map[string]string{
+			"com.docker.compose.project":              "webapp",
+			"com.docker.compose.project.config_files": live,
+		}},
+		"NetworkSettings": map[string]any{"Networks": map[string]any{}},
+	})
+	d.reads["volume ls --format json"] = `{"Name":"webapp_data"}` + "\n"
+	d.reads["volume inspect webapp_data"] = `[{"Name":"webapp_data","Driver":"local","Scope":"local",` +
 		`"Labels":{"com.docker.compose.project":"webapp"}}]`
-	d.reads["compose -f "+file+" config --format json"] =
-		`{"name":"webapp","volumes":{"pgdata":{}}}`
+	d.reads["compose -f "+live+" config --format json"] = `{"name":"webapp","volumes":{"data":{}}}`
 	c, stdout, _ := config(t, d)
 	c.DryRun = true
-	c.MountInfo = filepath.Join(t.TempDir(), "mountinfo")
-	require.NoError(t, os.WriteFile(c.MountInfo,
-		[]byte("27 1 259:2 / "+dir+" rw,relatime shared:1 - ext4 /dev/nvme0n1p2 rw\n"), 0o644))
 
-	// The earlier run learns the project from the walk, the later from the index.
-	require.Equal(t, ExitOK, Do(context.Background(), c))
-	stdout.Reset()
 	require.Equal(t, ExitOK, Do(context.Background(), c))
 
-	assert.Contains(t, stdout.String(), "0 directories walked")
-	assert.NotContains(t, stdout.String(), "webapp_pgdata")
+	assert.NotContains(t, stdout.String(), "VOLUMES TO REMOVE")
 }

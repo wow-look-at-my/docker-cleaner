@@ -1,7 +1,7 @@
 docker-cleaner   DRY RUN
 containers offline over 30d (before 2026-07-29 12:00 UTC)
 build cache unused over 7d (before 2026-08-21 12:00 UTC)
-compose projects: search complete, 0 directories walked
+compose projects: resolved from docker
 
 BEFORE
 TYPE            TOTAL     ACTIVE    SIZE      RECLAIMABLE

@@ -19,17 +19,12 @@ import (
 
 // Config describes an invocation.
 type Config struct {
-	Options    plan.Options
-	DryRun     bool
-	Yes        bool
-	JSON       bool
-	ShowKept   bool
-	Rescan     bool
-	IndexPath  string
-	MountInfo  string
-	DockerRoot string
-	// ScanTimeout bounds the compose search. Past it the search is incomplete.
-	ScanTimeout time.Duration
+	Options   plan.Options
+	DryRun    bool
+	Yes       bool
+	JSON      bool
+	ShowKept  bool
+	IndexPath string
 
 	Runner dockercli.Runner
 	Stdout io.Writer
@@ -90,40 +85,13 @@ func Do(ctx context.Context, c Config) int {
 	return ExitOK
 }
 
-// discover resolves compose projects. The scanner is handed the mount table
-// but only runs if some project the index cannot explain remains.
-//
-// The search gets its own deadline. A walk of a whole machine, or a read of a
-// directory on a mount whose server is gone, can outlast anybody's patience,
-// and the answer it owes the plan already has a safe shape: an incomplete
-// search keeps every project it could not resolve.
+// discover resolves compose projects from what docker already holds: the
+// labels on every container, and the index that remembers them after `down`
+// removes the containers that carried them.
 func discover(ctx context.Context, c Config, snap dockercli.Snapshot) *compose.Discovery {
 	c.Progress.Stage("looking for compose projects")
-	idx := compose.LoadIndex(c.IndexPath)
-
-	if c.ScanTimeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, c.ScanTimeout)
-		defer cancel()
-	}
-
-	var scanner compose.Scanner
-	mounts, err := compose.ReadMounts(c.MountInfo, c.DockerRoot)
-	if err != nil {
-		// Without a mount table the search cannot be exhaustive, so say so
-		// rather than letting a missing file read as "no projects exist".
-		return &compose.Discovery{
-			Claims:   compose.Resolve(ctx, c.Runner, nil, c.Progress),
-			Complete: false,
-			Failures: []string{"cannot read " + c.MountInfo + ": " + err.Error()},
-		}
-	}
-	scanner = &compose.FSScanner{Mounts: mounts, Progress: c.Progress}
-
 	return compose.Discover(ctx, c.Runner, snap.Containers, plan.ComposeProjects(snap), compose.Options{
-		Index:    idx,
-		Scanner:  scanner,
-		Rescan:   c.Rescan,
+		Index:    compose.LoadIndex(c.IndexPath),
 		Now:      c.Now,
 		Progress: c.Progress,
 	})

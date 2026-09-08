@@ -13,23 +13,11 @@ import (
 	"github.com/wow-look-at-my/docker-cleaner/internal/dockercli"
 )
 
-// forbiddenScanner fails the test if the run walks the disk at all.
-type forbiddenScanner struct{ t *testing.T }
-
-func (s forbiddenScanner) Scan(context.Context) (ScanResult, error) {
-	s.t.Fatal("the index answered every project, so nothing should have walked the disk")
-	return ScanResult{}, nil
-}
-
-type stubScanner struct {
-	res    ScanResult
-	err    error
-	called int
-}
-
-func (s *stubScanner) Scan(context.Context) (ScanResult, error) {
-	s.called++
-	return s.res, s.err
+// write puts an empty file where a test needs a file to exist.
+func write(t *testing.T, path string) {
+	t.Helper()
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+	require.NoError(t, os.WriteFile(path, nil, 0o644))
 }
 
 // configRunner answers `docker compose config` with a project per file.
@@ -74,137 +62,139 @@ func labelled(project, files string) dockercli.Container {
 	return c
 }
 
-// The load-bearing performance claim: on a machine the tool already knows, a
-// run is index lookups and stat calls. Nothing touches the filesystem tree.
-func TestAKnownProjectCostsNoWalk(t *testing.T) {
+// The load-bearing performance claim: a run is label reads, index lookups and
+// stat calls. Nothing reads a directory.
+func TestAKnownProjectCostsNoDirectoryRead(t *testing.T) {
 	dir := t.TempDir()
-	file := filepath.Join(dir, "compose.yaml")
+	file := filepath.Join(dir, "webapp", "compose.yaml")
 	write(t, file)
 	idx := LoadIndex(filepath.Join(dir, "projects.json"))
 	idx.Record("webapp", []string{file}, seen)
 	r := &configRunner{byFile: map[string]string{file: project("webapp")}}
 
-	d := Discover(context.Background(), r, nil, []string{"webapp"},
-		Options{Index: idx, Scanner: forbiddenScanner{t}, Now: seen})
+	d := Discover(context.Background(), r, nil, []string{"webapp"}, Options{Index: idx, Now: seen})
 
-	assert.Zero(t, d.DirsWalked)
 	assert.True(t, d.Complete)
 	assert.Equal(t, Alive, d.Resolve("webapp"))
 }
 
 // Container labels are exact and free, so a running stack needs no index entry
-// and no walk either.
+// and no look around the disk either.
 func TestContainerLabelsResolveAProjectForFree(t *testing.T) {
 	dir := t.TempDir()
-	file := filepath.Join(dir, "compose.yaml")
+	file := filepath.Join(dir, "webapp", "compose.yaml")
 	write(t, file)
 	idx := LoadIndex(filepath.Join(dir, "projects.json"))
 	r := &configRunner{byFile: map[string]string{file: project("webapp")}}
 
 	d := Discover(context.Background(), r, []dockercli.Container{labelled("webapp", file)},
-		[]string{"webapp"}, Options{Index: idx, Scanner: forbiddenScanner{t}, Now: seen})
+		[]string{"webapp"}, Options{Index: idx, Now: seen})
 
 	assert.Equal(t, Alive, d.Resolve("webapp"))
 	assert.Equal(t, []string{file}, idx.Files("webapp"), "the label is remembered for after the down")
 }
 
-func TestAnUnknownProjectTriggersTheWalk(t *testing.T) {
+// A stopped container names its project's files as exactly as a running
+// container does, so a stack that is merely down needs no directory read.
+func TestAStoppedContainerResolvesItsProjectToo(t *testing.T) {
 	dir := t.TempDir()
-	file := filepath.Join(dir, "compose.yaml")
+	file := filepath.Join(dir, "webapp", "compose.yaml")
 	write(t, file)
-	scanner := &stubScanner{res: ScanResult{Files: []string{file}, Dirs: 42}}
+	stopped := labelled("webapp", file)
+	stopped.State.Status = "exited"
 	r := &configRunner{byFile: map[string]string{file: project("webapp")}}
 
-	d := Discover(context.Background(), r, nil, []string{"webapp"},
-		Options{Index: LoadIndex(filepath.Join(dir, "projects.json")), Scanner: scanner, Now: seen})
+	d := Discover(context.Background(), r, []dockercli.Container{stopped}, []string{"webapp"},
+		Options{Index: LoadIndex(filepath.Join(dir, "projects.json")), Now: seen})
 
-	assert.Equal(t, 1, scanner.called)
-	assert.Equal(t, 42, d.DirsWalked)
 	assert.Equal(t, Alive, d.Resolve("webapp"))
 }
 
-func TestRescanWalksEvenWhenTheIndexAnswers(t *testing.T) {
-	dir := t.TempDir()
-	file := filepath.Join(dir, "compose.yaml")
-	write(t, file)
-	idx := LoadIndex(filepath.Join(dir, "projects.json"))
-	idx.Record("webapp", []string{file}, seen)
-	scanner := &stubScanner{res: ScanResult{Files: []string{file}, Dirs: 7}}
-	r := &configRunner{byFile: map[string]string{file: project("webapp")}}
-
-	d := Discover(context.Background(), r, nil, []string{"webapp"},
-		Options{Index: idx, Scanner: scanner, Rescan: true, Now: seen})
-
-	assert.Equal(t, 1, scanner.called)
-	assert.Equal(t, 7, d.DirsWalked)
-}
-
-// Deleting the compose file is what retires a project, and an exhaustive
-// search is what makes that safe to act on.
-func TestAnExhaustiveSearchThatFindsNothingMeansDeleted(t *testing.T) {
+// Deleting the compose file is what retires a project. Docker named that file
+// already, so its absence is a fact rather than a failure to look.
+func TestAVanishedFileDockerOnceNamedMeansDeleted(t *testing.T) {
 	dir := t.TempDir()
 	idx := LoadIndex(filepath.Join(dir, "projects.json"))
-	idx.Record("webapp", []string{filepath.Join(dir, "compose.yaml")}, seen)
-	scanner := &stubScanner{res: ScanResult{Dirs: 100}}
+	idx.Record("webapp", []string{filepath.Join(dir, "webapp", "compose.yaml")}, seen)
 
 	d := Discover(context.Background(), &configRunner{}, nil, []string{"webapp"},
-		Options{Index: idx, Scanner: scanner, Now: seen})
+		Options{Index: idx, Now: seen})
 
 	assert.True(t, d.Complete)
 	assert.Equal(t, Deleted, d.Resolve("webapp"))
-	assert.Empty(t, idx.Projects, "the index tracks the disk, so a dead project is dropped")
 }
 
-// Not looking is never evidence of deletion.
-func TestAnIncompleteSearchMeansUnknown(t *testing.T) {
-	scanner := &stubScanner{res: ScanResult{Failures: []string{"/srv: permission denied"}}}
-
-	d := Discover(context.Background(), &configRunner{}, nil, []string{"webapp"},
-		Options{Index: LoadIndex(filepath.Join(t.TempDir(), "projects.json")), Scanner: scanner, Now: seen})
-
-	assert.False(t, d.Complete)
-	assert.Equal(t, Unknown, d.Resolve("webapp"))
-	assert.Equal(t, []string{"/srv: permission denied"}, d.Failures)
-}
-
-func TestAScannerErrorIsAlsoIncomplete(t *testing.T) {
-	scanner := &stubScanner{err: errors.New("cannot read /proc/self/mountinfo")}
-
-	d := Discover(context.Background(), &configRunner{}, nil, []string{"webapp"},
-		Options{Index: LoadIndex(filepath.Join(t.TempDir(), "projects.json")), Scanner: scanner, Now: seen})
-
-	assert.False(t, d.Complete)
-	assert.Equal(t, Unknown, d.Resolve("webapp"))
-	assert.Contains(t, d.Failures[0], "mountinfo")
-}
-
-// A stack downed before the tool was installed leaves nothing to read labels
-// from, so the walk finds the file and the index remembers it from then on.
-func TestTheWalkFeedsTheIndex(t *testing.T) {
+// The record that retires a project is kept while a resource still claims it,
+// so a dry run and the real run that follows reach the same conclusion.
+func TestTheEvidenceOfDeletionSurvivesTheRunThatFindsIt(t *testing.T) {
 	dir := t.TempDir()
-	file := filepath.Join(dir, "compose.yaml")
+	idx := LoadIndex(filepath.Join(dir, "projects.json"))
+	idx.Record("webapp", []string{filepath.Join(dir, "webapp", "compose.yaml")}, seen)
+
+	Discover(context.Background(), &configRunner{}, nil, []string{"webapp"}, Options{Index: idx, Now: seen})
+	again := Discover(context.Background(), &configRunner{}, nil, []string{"webapp"}, Options{Index: idx, Now: seen})
+
+	assert.Equal(t, Deleted, again.Resolve("webapp"))
+}
+
+// After no docker resource claims a project, nothing is left to remember.
+func TestAnUnclaimedProjectLeavesTheIndex(t *testing.T) {
+	dir := t.TempDir()
+	idx := LoadIndex(filepath.Join(dir, "projects.json"))
+	idx.Record("webapp", []string{filepath.Join(dir, "webapp", "compose.yaml")}, seen)
+
+	Discover(context.Background(), &configRunner{}, nil, nil, Options{Index: idx, Now: seen})
+
+	assert.Empty(t, idx.Projects)
+}
+
+// A project nothing ever named a file for is unknown, not deleted. Not looking
+// in the right place is never evidence.
+func TestAProjectNothingEverNamedIsUnknown(t *testing.T) {
+	d := Discover(context.Background(), &configRunner{}, nil, []string{"mystery"},
+		Options{Index: LoadIndex(filepath.Join(t.TempDir(), "projects.json")), Now: seen})
+
+	assert.Equal(t, Unknown, d.Resolve("mystery"))
+}
+
+// A compose file that would not render may name the missing project, so the run
+// says so rather than retiring anything.
+func TestAnUnreadableComposeFileMeansUnknown(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "webapp", "compose.yaml")
 	write(t, file)
 	idx := LoadIndex(filepath.Join(dir, "projects.json"))
-	r := &configRunner{byFile: map[string]string{file: project("webapp")}}
+	idx.Record("webapp", []string{file}, seen)
+	r := &configRunner{fail: map[string]string{file: "yaml: line 3: did not find expected key"}}
 
-	Discover(context.Background(), r, nil, []string{"webapp"},
-		Options{Index: idx, Scanner: &stubScanner{res: ScanResult{Files: []string{file}}}, Now: seen})
+	d := Discover(context.Background(), r, nil, []string{"webapp"}, Options{Index: idx, Now: seen})
 
-	assert.Equal(t, []string{file}, idx.Files("webapp"))
+	assert.False(t, d.Complete)
+	assert.Equal(t, Unknown, d.Resolve("webapp"))
 }
 
-func TestSkippedMountsAndWarningsReachTheReport(t *testing.T) {
+// A recorded path the tool may not stat reads as gone, and a project that
+// docker still names is resolved from the label rather than from that path.
+func TestAContainerLabelOutranksAnUnreadableRecordedPath(t *testing.T) {
 	dir := t.TempDir()
-	require.NoError(t, os.Chmod(dir, 0o755))
+	live := filepath.Join(dir, "webapp", "compose.yaml")
+	write(t, live)
 	idx := LoadIndex(filepath.Join(dir, "projects.json"))
+	idx.Record("webapp", []string{filepath.Join(dir, "moved", "compose.yaml")}, seen)
+	r := &configRunner{byFile: map[string]string{live: project("webapp")}}
+
+	d := Discover(context.Background(), r, []dockercli.Container{labelled("webapp", live)},
+		[]string{"webapp"}, Options{Index: idx, Now: seen})
+
+	assert.Equal(t, Alive, d.Resolve("webapp"))
+}
+
+func TestTheIndexWarningReachesTheReport(t *testing.T) {
+	idx := LoadIndex(filepath.Join(t.TempDir(), "projects.json"))
 	idx.Warning = "cannot write the project index"
-	scanner := &stubScanner{res: ScanResult{Skipped: []Mount{{Point: "/proc", Skip: "kernel filesystem (proc)"}}}}
 
-	d := Discover(context.Background(), &configRunner{}, nil, []string{"gone"},
-		Options{Index: idx, Scanner: scanner, Now: seen})
+	d := Discover(context.Background(), &configRunner{}, nil, []string{"gone"}, Options{Index: idx, Now: seen})
 
-	require.Len(t, d.Skipped, 1)
-	assert.Equal(t, "/proc", d.Skipped[0].Point)
 	assert.Contains(t, d.Warning, "cannot write")
 }
 

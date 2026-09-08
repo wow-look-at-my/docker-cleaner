@@ -70,13 +70,9 @@ func Compute(s dockercli.Snapshot, d *compose.Discovery, o Options, now time.Tim
 		Cutoff:          b.cutoff,
 		CacheCutoff:     b.cacheCutoff,
 		ComposeComplete: d == nil || d.Complete,
-		DirsWalked:      dirsWalked(d),
 	}
 	if d != nil {
 		b.plan.ComposeFailures = d.Failures
-		for _, m := range d.Skipped {
-			b.plan.SkippedMounts = append(b.plan.SkippedMounts, m.Point+" ("+m.Skip+")")
-		}
 		if d.Warning != "" {
 			b.plan.Warnings = append(b.plan.Warnings, d.Warning)
 		}
@@ -102,13 +98,6 @@ func Compute(s dockercli.Snapshot, d *compose.Discovery, o Options, now time.Tim
 		return b.plan.Kept[i].Name < b.plan.Kept[j].Name
 	})
 	return b.plan
-}
-
-func dirsWalked(d *compose.Discovery) int {
-	if d == nil {
-		return 0
-	}
-	return d.DirsWalked
 }
 
 func (b *builder) keep(kind Kind, name string, reason Reason, detail string) {
@@ -157,5 +146,5 @@ func (b *builder) composeUnresolvedImage(dockercli.Image) (Reason, string, bool)
 	if b.disco == nil || b.disco.Complete {
 		return "", "", false
 	}
-	return ReasonScanIncomplete, "the compose search was incomplete", true
+	return ReasonScanIncomplete, "a compose file went unread", true
 }

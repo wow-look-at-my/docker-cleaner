@@ -37,13 +37,9 @@ type options struct {
 	keep         []string
 	json         bool
 	showKept     bool
-	rescan       bool
 	dockerBin    string
 	timeout      time.Duration
-	scanTimeout  time.Duration
 	indexPath    string
-	mountInfo    string
-	dockerRoot   string
 	progress     string
 }
 
@@ -170,11 +166,7 @@ func clean(cmd *cobra.Command, opts *options) error {
 		Yes:         opts.yes,
 		JSON:        opts.json,
 		ShowKept:    opts.showKept,
-		Rescan:      opts.rescan,
 		IndexPath:   opts.indexPath,
-		MountInfo:   opts.mountInfo,
-		DockerRoot:  opts.dockerRoot,
-		ScanTimeout: opts.scanTimeout,
 		Runner:      runner,
 		Stdout:      cmd.OutOrStdout(),
 		Stderr:      cmd.ErrOrStderr(),
@@ -202,16 +194,11 @@ func bindRootFlags(root *cobra.Command, opts *options) {
 	f.StringArrayVar(&opts.keep, "keep", nil, "keep images matching this glob (repeatable)")
 	f.BoolVar(&opts.json, "json", false, "emit the plan as JSON, including every command's argv")
 	f.BoolVar(&opts.showKept, "show-kept", false, "list every kept resource instead of counts")
-	f.BoolVar(&opts.rescan, "rescan", false, "walk the disk for compose files even if the index answers")
 	f.StringVar(&opts.dockerBin, "docker-bin", "docker", "docker executable to run")
 	f.DurationVar(&opts.timeout, "timeout", 2*time.Minute, "timeout for a docker invocation")
-	f.DurationVar(&opts.scanTimeout, "scan-timeout", 5*time.Minute,
-		"give up searching the disk for compose files after this, keeping every project the search could not resolve (0 waits forever)")
 	f.StringVar(&opts.progress, "progress", "auto",
 		"show what the run is doing on stderr: "+strings.Join(progressModes, ", "))
 	f.StringVar(&opts.indexPath, "index", compose.DefaultIndexPath, "where the compose project index lives")
-	f.StringVar(&opts.mountInfo, "mountinfo", compose.DefaultMountInfo, "mount table naming the filesystems to search")
-	f.StringVar(&opts.dockerRoot, "docker-root", "/var/lib/docker", "docker's storage root, excluded from the search")
 }
 
 // Execute runs the command line and returns the process exit code.

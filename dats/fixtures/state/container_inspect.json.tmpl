@@ -16,7 +16,11 @@
     "Image": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
     "Created": "@@OLD@@",
     "State": {"Status": "running", "ExitCode": 0, "StartedAt": "@@RECENT@@", "FinishedAt": "0001-01-01T00:00:00Z"},
-    "Config": {"Image": "postgres:16", "Labels": {}},
+    "Config": {"Image": "postgres:16", "Labels": {
+      "com.docker.compose.project": "webapp",
+      "com.docker.compose.project.config_files": "/srv/webapp/compose.yaml",
+      "com.docker.compose.project.working_dir": "/srv/webapp"
+    }},
     "HostConfig": {"RestartPolicy": {"Name": "unless-stopped"}},
     "Mounts": [{"Type": "volume", "Name": "pgdata-live"}, {"Type": "bind", "Source": "/srv/conf"}],
     "NetworkSettings": {"Networks": {"bridge": {"NetworkID": "n1"}}}

@@ -27,19 +27,21 @@ Bind mounts (docker cannot), anything a surviving container holds, and the newes
 
 `docker compose down` deletes the containers, so the project disappears from docker's view and its named volumes look like garbage. They are not. docker-cleaner treats a project as alive while its compose file exists on disk, so a downed stack keeps its database. **Deleting the compose file is what retires a project** — that is the whole escape hatch, and it needs no flag.
 
-Finding those files is fast because the tool remembers them: every container names its project's compose files in a label, and that goes into an index at `/var/lib/docker-cleaner/projects.json`. An ordinary run is index lookups and `stat` calls. Only a project the index has never heard of costs a filesystem search, and the results go into the index, so it happens once per project rather than once per run.
+Docker already knows where those files are. Every container carries its project's compose files and working directory in a label, running or stopped. The tool copies that into an index at `/var/lib/docker-cleaner/projects.json`, so the paths survive the `down` that deletes the containers. A run is label reads, index lookups and `stat` calls. It never crawls the disk.
 
-If the search cannot run everywhere — an unreadable directory, a denied mount — the run says so and keeps every unresolved project's resources. Not looking is never evidence of deletion. Run it as root for a complete search.
+Nothing is hunted for on the disk. A project that has ever been started names its own files, so the only projects neither source explains are ones nothing ever started here. Those are kept, not removed.
+
+Retirement needs evidence: a path docker gave us that is now gone. Not looking is never evidence of deletion.
 
 ## While it works
 
-A run reports each step on stderr. It names the docker read it waits on. It counts the directories the search walks and the compose files it reads. On a terminal it redraws a line in place. Anywhere else it prints a line per change, so a log keeps every step. `--progress never` turns it off. Only the report goes to stdout, so `--json` stays parseable either way.
+A run reports each step on stderr. It names the docker read it waits on and the volume it is measuring, over a fraction of the calls it has left. On a terminal it redraws a line in place. Anywhere else it prints a line per change, so a log keeps every step. `--progress never` turns it off. Only the report goes to stdout, so `--json` stays parseable either way.
 
-The search gives up after `--scan-timeout` (default `5m`). Before this it waited forever on a wedged network mount, or on a directory that leads back into itself. To give up is safe: the run then reports the search as incomplete, which keeps every project it cannot resolve. `Ctrl-C` stops a run at once.
+`Ctrl-C` stops a run at once.
 
 ### Optional: `docker-cleaner watch`
 
-Docker forgets a project's file paths when its containers go, so a stack brought up and down between two cleanups leaves nothing to read. `docker-cleaner watch` tails `docker events` and records those paths as containers are created, which keeps such a project off the search path. It is an optimisation, never a requirement: a project it misses is simply searched for.
+Docker forgets a project's file paths when its containers go, so a stack brought up and down between two cleanups leaves nothing to read. `docker-cleaner watch` tails `docker events` and records those paths as containers are created. It is an optimisation, never a requirement. A project it misses is kept rather than removed.
 
 ```ini
 # /etc/systemd/system/docker-cleaner-watch.service
@@ -55,15 +57,11 @@ WantedBy=multi-user.target
 
 ## Speed
 
-Measured on a container holding 26,832 directories, with docker's own reads served from fixtures so the numbers are the tool's own work:
+Compose discovery reads no directory the projects do not live in, so its cost does not grow with the disk. What is left is docker's own reads, which run at the same time as each other, and the volume measurement.
 
-| run | directories walked | wall clock |
-|-----|--------------------|------------|
-| the index answers every project | 0 | 0.03s |
-| `--rescan`, page cache warm | 26,832 | 0.36s |
-| first walk, page cache cold | 26,830 | 26.6s |
+A volume is measured by walking what its driver mounts, because the daemon offers no other way to size one. Those reads run several at a time inside the volume in hand. A volume holding a nested docker root therefore does not hold the run up on a single reader.
 
-The first row is the steady state. Reproduce any of them with `time docker-cleaner --dry-run`, and check the `directories walked` count in the header.
+No decision about what to remove reads a size. A volume the tool cannot read is reported as unmeasured. The plan is unaffected.
 
 ## Reading the plan before you trust it
 
