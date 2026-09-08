@@ -57,7 +57,8 @@ func Do(ctx context.Context, c Config) int {
 		return emitJSON(ctx, c, p)
 	}
 
-	if err := report.Text(c.Stdout, p, report.Summary(snap.DiskUsage), c.DryRun, c.ShowKept); err != nil {
+	before := report.Summary(snap.DiskUsage, snap.CacheUnavailable)
+	if err := report.Text(c.Stdout, p, before, c.DryRun, c.ShowKept); err != nil {
 		fmt.Fprintln(c.Stderr, "docker-cleaner:", err)
 		return ExitEnvironment
 	}

@@ -11,6 +11,7 @@ import (
 	"github.com/wow-look-at-my/go-containers/set"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -20,10 +21,12 @@ const DefaultIndexPath = "/var/lib/docker-cleaner/projects.json"
 // indexSchema rises with the on-disk shape; a newer file is discarded.
 const indexSchema = 1
 
-// Entry is a project's known compose files.
+// Entry is a project's compose files. Sets keeps each invocation apart, because
+// separate stacks share a project name. Files is the union.
 type Entry struct {
-	Files []string  `json:"files"`
-	Seen  time.Time `json:"seen"`
+	Files []string   `json:"files"`
+	Sets  [][]string `json:"sets,omitempty"`
+	Seen  time.Time  `json:"seen"`
 }
 
 // Index maps project name to the compose files that declare it.
@@ -89,6 +92,7 @@ func (i *Index) Record(project string, files []string, when time.Time) {
 		named.Add(f)
 		ordered = append(ordered, f)
 	}
+	e.Sets = withSet(e.Sets, ordered)
 	for _, f := range e.Files {
 		if !named.Contains(f) {
 			named.Add(f)
@@ -98,6 +102,47 @@ func (i *Index) Record(project string, files []string, when time.Time) {
 	e.Files = ordered
 	e.Seen = when
 	i.Projects[project] = e
+}
+
+// withSet adds a file set, leading, and drops a repeat of it.
+func withSet(sets [][]string, add []string) [][]string {
+	out := [][]string{add}
+	key := strings.Join(add, "\x00")
+	for _, s := range sets {
+		if strings.Join(s, "\x00") != key {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// Sets returns the file sets to render for a project, each holding only paths
+// that still exist. A set compose named is rendered as compose named it: the
+// files of separate stacks that share a project name never render together.
+func (i *Index) Sets(project string) [][]string {
+	e := i.Projects[project]
+	recorded := e.Sets
+	if len(recorded) == 0 && len(e.Files) > 0 {
+		// An index written before sets existed holds the union alone.
+		recorded = [][]string{e.Files}
+	}
+
+	var out [][]string
+	seen := set.New[string]()
+	for _, s := range recorded {
+		var live []string
+		for _, f := range s {
+			if st, err := os.Stat(f); err == nil && !st.IsDir() {
+				live = append(live, f)
+			}
+		}
+		key := strings.Join(live, "\x00")
+		if len(live) > 0 && !seen.Contains(key) {
+			seen.Add(key)
+			out = append(out, live)
+		}
+	}
+	return out
 }
 
 // Files returns the recorded paths for a project that still exist on disk.

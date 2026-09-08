@@ -83,6 +83,42 @@ func TestAnonymousVolumeIsLabelledAsSuch(t *testing.T) {
 	assert.Equal(t, hex64, p.Volumes[0].ID)
 }
 
+// A volume the walk could not read must not read as empty. Both print 0B, and
+// only the empty volume was measured.
+func TestAVolumeNothingMeasuredIsMarkedRatherThanShownEmpty(t *testing.T) {
+	snap := dockercli.Snapshot{
+		Volumes: []dockercli.Volume{localVolume("measured"), localVolume("unreadable")},
+		DiskUsage: dockercli.DiskUsage{Volumes: []dockercli.VolumeUsage{
+			{Name: "measured", Size: 4096, Measured: true},
+			{Name: "unreadable"},
+		}},
+	}
+
+	p := Compute(snap, noComposeFiles(), defaults(), now)
+
+	require.Len(t, p.Volumes, 2)
+	byName := map[string]Target{p.Volumes[0].ID: p.Volumes[0], p.Volumes[1].ID: p.Volumes[1]}
+	assert.False(t, byName["measured"].Unmeasured)
+	assert.Equal(t, int64(4096), byName["measured"].Size)
+	assert.True(t, byName["unreadable"].Unmeasured)
+}
+
+// A volume that really is empty stays a measurement, so it reports its size.
+func TestAnEmptyVolumeIsStillAMeasurement(t *testing.T) {
+	snap := dockercli.Snapshot{
+		Volumes: []dockercli.Volume{localVolume("empty")},
+		DiskUsage: dockercli.DiskUsage{
+			Volumes: []dockercli.VolumeUsage{{Name: "empty", Measured: true}},
+		},
+	}
+
+	p := Compute(snap, noComposeFiles(), defaults(), now)
+
+	require.Len(t, p.Volumes, 1)
+	assert.False(t, p.Volumes[0].Unmeasured)
+	assert.Zero(t, p.Volumes[0].Size)
+}
+
 func TestPredefinedNetworksNeverAppearInAPlan(t *testing.T) {
 	snap := dockercli.Snapshot{Networks: []dockercli.Network{
 		{ID: "n1", Name: "bridge", Driver: "bridge", Scope: "local"},

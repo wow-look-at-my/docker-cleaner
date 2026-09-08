@@ -20,8 +20,12 @@ var predefinedNetworks = set.Of[string]("bridge", "host", "none")
 // container list says.
 func (b *builder) selectVolumes() {
 	sizes := map[string]int64{}
+	measured := set.New[string]()
 	for _, v := range b.snap.DiskUsage.Volumes {
 		sizes[v.Name] = v.Size
+		if v.Measured {
+			measured.Add(v.Name)
+		}
 	}
 
 	volumes := append([]dockercli.Volume(nil), b.snap.Volumes...)
@@ -54,14 +58,15 @@ func (b *builder) selectVolumes() {
 		}
 
 		b.plan.Volumes = append(b.plan.Volumes, Target{
-			Kind:     KindVolume,
-			ID:       v.Name,
-			Name:     volumeName(v),
-			Detail:   volumeDetail(v),
-			Note:     volumeNote(v),
-			Size:     sizes[v.Name],
-			FreedBy:  b.refs.volume(v.Name).by,
-			Commands: [][]string{dockercli.RemoveVolume(v.Name)},
+			Kind:       KindVolume,
+			ID:         v.Name,
+			Name:       volumeName(v),
+			Detail:     volumeDetail(v),
+			Note:       volumeNote(v),
+			Size:       sizes[v.Name],
+			Unmeasured: !measured.Contains(v.Name),
+			FreedBy:    b.refs.volume(v.Name).by,
+			Commands:   [][]string{dockercli.RemoveVolume(v.Name)},
 		})
 	}
 }

@@ -75,6 +75,8 @@ type Target struct {
 	// Note flags a target worth another look. It never changes the verdict.
 	Note string
 	Size int64
+	// Unmeasured: nothing read this size, so it reads as "?" not as empty.
+	Unmeasured bool
 	// FreedBy names the containers whose removal made this collectible.
 	FreedBy []string
 	// Commands are the exact invocations, in order.

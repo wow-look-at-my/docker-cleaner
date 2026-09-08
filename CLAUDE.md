@@ -27,6 +27,8 @@ One command that removes docker resources nothing will use again. Read the READM
 - Nothing on the disk is searched for a compose file, ever. Docker names them on every container, running or stopped, and the index keeps them after the containers go. A project that has ever been started names its own files, so a project neither source explains was never started here.
 - "No compose file found" retires a project only when docker named that file already. A project nothing has ever named a file for is unknown. It keeps everything it claims.
 - The index is a cache of a fact, never the fact. A recorded path is `stat`ed before it is believed. A damaged index is discarded rather than half-parsed.
+- A project's files render in a single `docker compose -f ... -f ... config`, in compose's order. `-f` turns off the merge of an override beside its base, so rendering them apart loses whatever the override declares. The index keeps each invocation as its own set, because separate stacks share a project name.
+- A size nobody measured reads as `?`, never as `0B`. That covers a volume the walk cannot read and a build cache `buildx du` refuses to enumerate.
 - Zero `FinishedAt` parses to year one and beats every cutoff, so `dockercli.ParseTime` rejects it. See the trap list in the plan.
 - `buildx prune` acts on one builder, so every builder from `buildx ls` gets its own command. Its `until=` takes a Go duration: `168h`, never `7d`.
 - Protection is per image ID, not per tag: if one tag of an id is kept, no `rmi` is emitted for its other tags.
