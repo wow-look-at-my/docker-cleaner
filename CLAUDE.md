@@ -33,5 +33,8 @@ One command that removes docker resources nothing will use again. Read the READM
 - The read lists before it inspects, so the step count is real. The fraction is docker calls finished over docker calls to make. The line names the step that has waited longest, because that step holds the run up.
 - The inspects and the disk-usage pass run at the same time. `docker system df -v` walks every volume and outlasts the rest, so the read costs the slowest call rather than the sum.
 - `docker system df` is never called for a table. The report renders BEFORE and AFTER from the disk-usage pass the run already made. A second call means a second walk of every volume.
+- Every phase that calls docker is counted: the read, the apply, and the measurement after an apply. A call names itself before it runs, never after it returns, so a slow removal is visible while it happens.
+- `Stop` leaves the reporter usable, because the run still narrates after the report takes the screen. A later stage starts its draw loop again.
+- The apply log writes through `Reporter.Log`. A drawn line carries no newline, so a write straight to stdout lands on the end of it.
 - The compose search is bounded by `--scan-timeout` and by a depth limit, and it skips a directory it has already read, by device and inode. Each of those exits is a `Failure`, which marks the search incomplete and keeps every unresolved project.
 - A file the render never reached is `Unreadable`, never a project that declares nothing. The second reading retires a live project.
