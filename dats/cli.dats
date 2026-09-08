@@ -38,7 +38,7 @@ tests:
 	  outputs:
 		stderr:
 			- "docker-cleaner: asking docker what it holds"
-			- "0% (0 of 4)"
+			- "0% (0 of 6)"
 			- "measuring volume "
 			- "docker-cleaner: looking for compose projects"
 			- "docker-cleaner: deciding what to remove"
