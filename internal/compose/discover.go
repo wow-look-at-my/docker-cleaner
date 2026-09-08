@@ -96,9 +96,8 @@ func Discover(ctx context.Context, r dockercli.Runner, containers []dockercli.Co
 		idx.Record(project, p.Files, o.Now)
 	}
 
-	// A search cut short reached neither every directory nor every file, so
-	// "no compose file names this project" stops being evidence of deletion.
-	// The walk reports its own end, so this covers the render.
+	// A search cut short read neither every directory nor every file, so a
+	// project no compose file names is not deleted. This covers the render.
 	if ctx.Err() != nil && d.Complete {
 		d.Complete = false
 		d.Failures = append(d.Failures, "the compose search ran out of time before every file was read")
