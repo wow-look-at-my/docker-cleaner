@@ -31,6 +31,8 @@ func TestCommittedFlagReferenceIsCurrent(t *testing.T) {
 }
 
 func TestEveryFlagIsDocumented(t *testing.T) {
+	t.Parallel()
+
 	got, err := HelpDump()
 	require.NoError(t, err)
 
@@ -48,6 +50,8 @@ func TestEveryFlagIsDocumented(t *testing.T) {
 // An interactive prompt inside a JSON document is unparseable, so the flag
 // combination is refused rather than silently producing junk.
 func TestJSONWithoutDryRunOrYesIsRefused(t *testing.T) {
+	t.Parallel()
+
 	err := runRoot(t, "--json")
 
 	require.Error(t, err)
@@ -55,6 +59,8 @@ func TestJSONWithoutDryRunOrYesIsRefused(t *testing.T) {
 }
 
 func TestABadAgeIsRejectedBeforeDockerIsTouched(t *testing.T) {
+	t.Parallel()
+
 	for flag, want := range map[string]string{
 		"--age=tuesday":            "--age",
 		"--build-cache-age=-1h":    "--build-cache-age",
@@ -69,28 +75,36 @@ func TestABadAgeIsRejectedBeforeDockerIsTouched(t *testing.T) {
 }
 
 func TestExtraArgumentsAreRejected(t *testing.T) {
+	t.Parallel()
+
 	err := runRoot(t, "everything")
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unknown command")
 }
 
-// runRoot parses an invocation. Every case here fails before RunE reaches
-// docker, so nothing runs and nothing exits.
+// A parsed flag must not reach the next invocation. A leaked --dry-run carries
+// --json past the guard above and into a real run, which then reads docker and
+// walks the disk.
+func TestAnInvocationDoesNotLeakItsFlags(t *testing.T) {
+	t.Parallel()
+
+	require.Error(t, runRoot(t, "--age=tuesday", "--dry-run"))
+
+	err := runRoot(t, "--json")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "--json needs --dry-run or --yes")
+}
+
+// runRoot parses an invocation on a command tree of its own, so a test never
+// sees another test's flags. Every case here fails before RunE reaches docker.
 func runRoot(t *testing.T, args ...string) error {
 	t.Helper()
-	// Flags keep their last parsed value, so start from the defaults.
-	opts.age, opts.cacheAge, opts.json, opts.dryRun = "30d", "7d", false, false
 
 	var out strings.Builder
-	rootCmd.SetOut(&out)
-	rootCmd.SetErr(&out)
-	rootCmd.SetArgs(args)
-	t.Cleanup(func() {
-		rootCmd.SetArgs(nil)
-		rootCmd.SetOut(nil)
-		rootCmd.SetErr(nil)
-		opts.age, opts.cacheAge, opts.json, opts.dryRun = "30d", "7d", false, false
-	})
-	return rootCmd.Execute()
+	root := newRootCmd()
+	root.SetOut(&out)
+	root.SetErr(&out)
+	root.SetArgs(args)
+	return root.Execute()
 }

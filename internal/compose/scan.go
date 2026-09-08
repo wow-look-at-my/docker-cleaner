@@ -22,8 +22,7 @@ var composeNames = set.Of[string]("compose.yaml",
 // defaultWorkers walks several mounts at a time. The disk dominates the work.
 const defaultWorkers = 16
 
-// defaultMaxDepth ends a path that grows without end. A real project sits
-// nowhere near this deep, and reaching the limit is reported, never silent.
+// defaultMaxDepth ends a path that grows without end. Reaching it is reported.
 const defaultMaxDepth = 128
 
 // fileID names a directory for the visited set and for the mount-boundary
