@@ -116,8 +116,6 @@ type Plan struct {
 	// ComposeComplete false changes what "not found" means, so it is reported.
 	ComposeComplete bool
 	ComposeFailures []string
-	SkippedMounts   []string
-	DirsWalked      int
 	Warnings        []string
 }
 

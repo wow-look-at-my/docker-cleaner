@@ -19,21 +19,17 @@ Flags:
       --age string               remove containers offline longer than this (30d, 4w, 720h, 1h30m) (default "30d")
       --build-cache-age string   remove build cache unused longer than this (default "7d")
       --docker-bin string        docker executable to run (default "docker")
-      --docker-root string       docker's storage root, excluded from the search (default "/var/lib/docker")
       --dry-run                  show the plan and remove nothing
   -h, --help                     help for docker-cleaner
       --index string             where the compose project index lives (default "/var/lib/docker-cleaner/projects.json")
       --json                     emit the plan as JSON, including every command's argv
       --keep stringArray         keep images matching this glob (repeatable)
-      --mountinfo string         mount table naming the filesystems to search (default "/proc/self/mountinfo")
       --no-build-cache           leave build cache alone
       --no-containers            leave containers alone
       --no-images                leave images alone
       --no-networks              leave networks alone
       --no-volumes               leave volumes alone
       --progress string          show what the run is doing on stderr: auto, always, never (default "auto")
-      --rescan                   walk the disk for compose files even if the index answers
-      --scan-timeout duration    give up searching the disk for compose files after this, keeping every project the search could not resolve (0 waits forever) (default 5m0s)
       --show-kept                list every kept resource instead of counts
       --timeout duration         timeout for a docker invocation (default 2m0s)
   -v, --version                  version for docker-cleaner
@@ -45,11 +41,10 @@ Record compose projects as docker creates their containers.
 
 Docker names a project's compose files on the containers it creates and forgets
 them when those containers go. Running this keeps the record, so a stack that
-was up and then down between two cleanups is still recognised without searching
-the disk for it.
+came up and went down between two cleanups is still recognised.
 
-It is an optimisation, never a requirement: a project this misses is simply
-unresolved, and an unresolved project falls through to the filesystem search.
+It is an optimisation, never a requirement: a project this misses is looked for
+beside the projects docker still names, and a project found nowhere is kept.
 
 Usage:
   docker-cleaner watch [flags]

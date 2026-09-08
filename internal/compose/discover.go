@@ -2,12 +2,14 @@ package compose
 
 import (
 	"context"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/wow-look-at-my/docker-cleaner/internal/dockercli"
 	"github.com/wow-look-at-my/docker-cleaner/internal/progress"
+	"github.com/wow-look-at-my/go-containers/set"
 )
 
 // Label keys compose writes. Only container labels name files on disk, which
@@ -15,6 +17,7 @@ import (
 const (
 	LabelProject     = "com.docker.compose.project"
 	LabelConfigFiles = "com.docker.compose.project.config_files"
+	LabelWorkingDir  = "com.docker.compose.project.working_dir"
 )
 
 // Discovery is the compose picture for a run.
@@ -22,69 +25,73 @@ type Discovery struct {
 	Claims *Claims
 	// Index is carried so the caller can persist what this run learned.
 	Index *Index
-	// Complete false means an unresolved project is unknown, not deleted.
+	// Complete false means a compose file this run named went unread.
 	Complete bool
 	Failures []string
-	Skipped  []Mount
-	// DirsWalked counts nothing when the index answered everything.
-	DirsWalked int
-	Warning    string
+	Warning  string
+
+	// unheard: nothing ever named a file for these, so they are never deleted.
+	unheard set.Set[string]
 }
 
 // Options configures discovery.
 type Options struct {
-	Index   *Index
-	Scanner Scanner
-	// Rescan walks the disk even when the index already answers everything.
-	Rescan   bool
+	Index    *Index
 	Now      time.Time
 	Progress *progress.Reporter
 }
 
 // Discover resolves every compose project that could own a docker resource.
 //
-// Container labels are exact and free, so they come before anything else. The index supplies
-// what `down` deleted. Only a project that neither can explain is worth a
-// filesystem walk, which is what keeps an ordinary run to a handful of stat
-// calls.
+// Docker holds the answer already. Every container carries the files that
+// declare its project and the directory it came up in, whether it runs or not.
+// The index keeps those paths after `down` deletes the containers that carried
+// them. What neither explains is looked for beside the project directories
+// docker did name, because compose names a project after its own directory and
+// a machine keeps its stacks together.
 func Discover(ctx context.Context, r dockercli.Runner, containers []dockercli.Container, wanted []string, o Options) *Discovery {
 	idx := o.Index
-	d := &Discovery{Complete: true, Index: idx}
+	d := &Discovery{Complete: true, Index: idx, unheard: set.New[string]()}
 
+	var parents []string
 	for _, c := range containers {
-		project := c.Config.Labels[LabelProject]
-		files := splitList(c.Config.Labels[LabelConfigFiles])
-		idx.Record(project, files, o.Now)
+		labels := c.Config.Labels
+		idx.Record(labels[LabelProject], splitList(labels[LabelConfigFiles]), o.Now)
+		if dir := labels[LabelWorkingDir]; dir != "" {
+			parents = append(parents, filepath.Dir(dir))
+		}
+	}
+	// A project the index knows sits beside the ones it does not.
+	for _, e := range idx.Projects {
+		for _, f := range e.Files {
+			parents = append(parents, filepath.Dir(filepath.Dir(f)))
+		}
 	}
 
 	files := map[string]bool{}
-	unresolved := false
+	var unresolved []string
 	for _, project := range wanted {
 		found := idx.Files(project)
 		for _, f := range found {
 			files[f] = true
 		}
 		if len(found) == 0 {
-			unresolved = true
+			unresolved = append(unresolved, project)
+			// Nothing has ever named a file for a project the index never
+			// recorded, so a missing file says nothing about it.
+			if !idx.Recorded(project) {
+				d.unheard.Add(project)
+			}
 		}
 	}
 
-	if (unresolved || o.Rescan) && o.Scanner != nil {
-		o.Progress.Stage("searching the disk for compose files")
-		res, err := o.Scanner.Scan(ctx)
-		if err != nil {
-			d.Complete = false
-			d.Failures = append(d.Failures, err.Error())
-		}
+	if len(unresolved) > 0 {
+		o.Progress.Stage("looking beside the compose projects docker named")
+		res := probe(ctx, parents, unresolved)
 		for _, f := range res.Files {
 			files[f] = true
 		}
 		d.Failures = append(d.Failures, res.Failures...)
-		d.Skipped = res.Skipped
-		d.DirsWalked = res.Dirs
-		if !res.Complete() {
-			d.Complete = false
-		}
 	}
 
 	found := sortedKeys(files)
@@ -96,18 +103,16 @@ func Discover(ctx context.Context, r dockercli.Runner, containers []dockercli.Co
 		idx.Record(project, p.Files, o.Now)
 	}
 
-	// A search cut short read neither every directory nor every file, so a
-	// project no compose file names is not deleted. This covers the render.
+	// A run cut short read neither every directory nor every file, so a project
+	// no compose file names is not deleted. This covers the render.
 	if ctx.Err() != nil && d.Complete {
 		d.Complete = false
 		d.Failures = append(d.Failures, "the compose search ran out of time before every file was read")
 	}
-	// Drop a project whose files all vanished, so the index tracks the disk.
-	for _, project := range wanted {
-		if !d.Claims.Known(project) && len(idx.Files(project)) == 0 {
-			idx.Forget(project)
-		}
+	if len(d.Claims.Unreadable) > 0 {
+		d.Complete = false
 	}
+	forgetUnclaimed(idx, d.Claims, wanted)
 	d.Warning = idx.Warning
 	return d
 }
@@ -118,9 +123,9 @@ type Resolution int
 const (
 	// Alive: a compose file on disk still declares the project.
 	Alive Resolution = iota
-	// Deleted: an exhaustive search found no such file.
+	// Deleted: docker named this project's file, and that file is gone.
 	Deleted
-	// Unknown: the search was not exhaustive, so nothing acts on it.
+	// Unknown: nothing named a file for it, so nothing acts on it.
 	Unknown
 )
 
@@ -129,10 +134,30 @@ func (d *Discovery) Resolve(project string) Resolution {
 	switch {
 	case d.Claims.Known(project):
 		return Alive
-	case d.Complete:
-		return Deleted
-	default:
+	case !d.Complete || d.unheard.Contains(project):
 		return Unknown
+	default:
+		return Deleted
+	}
+}
+
+// forgetUnclaimed drops what the index has no reason to hold. A record whose
+// files are gone is the evidence that retires a project, so it stays while a
+// docker resource still claims that project. After nothing claims it, there is
+// nothing left to remember.
+func forgetUnclaimed(idx *Index, claims *Claims, wanted []string) {
+	want := set.New[string]()
+	for _, project := range wanted {
+		want.Add(project)
+	}
+	var gone []string
+	for project := range idx.Projects {
+		if !want.Contains(project) && !claims.Known(project) && len(idx.Files(project)) == 0 {
+			gone = append(gone, project)
+		}
+	}
+	for _, project := range gone {
+		idx.Forget(project)
 	}
 }
 

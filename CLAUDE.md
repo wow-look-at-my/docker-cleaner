@@ -12,7 +12,7 @@ One command that removes docker resources nothing will use again. Read the READM
 
 - `main.go`, `cmd/` -- cobra surface. `root.go` is the cleanup, `watch.go` the events recorder, `inject.go` the runner seam, `docs.go` the generated help dump.
 - `internal/dockercli/` -- every docker read and write. `read.go` gathers a Snapshot, `apply.go` turns one target into one argv, `summary.go` renders the usage table.
-- `internal/compose/` -- will a project still on disk attach this? `index.go` remembers paths, `scan.go` searches for them, `project.go` renders a compose file, `discover.go` decides alive, deleted or unknown.
+- `internal/compose/` -- will a project still on disk attach this? `index.go` remembers paths, `probe.go` looks beside the projects docker named, `project.go` renders a compose file, `discover.go` decides alive, deleted or unknown.
 - `internal/plan/` -- `Compute` is pure: snapshot plus options plus one clock reading gives the plan. Nothing else decides what goes.
 - `internal/report/` -- the terminal report (`text.go`) and the JSON document (`json.go`).
 - `internal/progress/` -- says what the run is doing, on stderr, while it does it. A nil `*Reporter` is a working no-op.
@@ -24,7 +24,8 @@ One command that removes docker resources nothing will use again. Read the READM
 - A dry run issues no mutating command at all. The dats suite asserts the log file does not exist.
 - Never `docker rm -v`, never `docker rmi -f`, never `docker image ls -a`. `--force` is right only on `buildx prune`, where it means "do not ask".
 - A read that fails is fatal (exit 3): a partial read makes a confident, wrong plan. An apply failure is reported and the run continues (exit 1).
-- "No compose file found" acts only when the search was exhaustive. Any unreadable directory or unwalkable mount keeps every unresolved project.
+- The disk is never crawled for compose files. Docker names them on every container, running or stopped, and the index keeps them after the containers go. A project neither explains is looked for beside the project directories docker did name, one directory read per parent.
+- "No compose file found" retires a project only when docker named that file already. A project nothing has ever named a file for is unknown. It keeps everything it claims.
 - The index is a cache of a fact, never the fact. A recorded path is `stat`ed before it is believed. A damaged index is discarded rather than half-parsed.
 - Zero `FinishedAt` parses to year one and beats every cutoff, so `dockercli.ParseTime` rejects it. See the trap list in the plan.
 - `buildx prune` acts on one builder, so every builder from `buildx ls` gets its own command. Its `until=` takes a Go duration: `168h`, never `7d`.
@@ -39,5 +40,5 @@ One command that removes docker resources nothing will use again. Read the READM
 - Every phase that calls docker is counted: the read, the apply, and the measurement after an apply. A call names itself before it runs, never after it returns. A slow removal is visible while it happens.
 - `Stop` leaves the reporter usable, because the run still narrates after the report takes the screen. A later stage starts its draw loop again.
 - The apply log writes through `Reporter.Log`. A drawn line carries no newline, so a write straight to stdout lands on the end of it.
-- The compose search is bounded by `--scan-timeout` and by a depth limit, and it skips a directory it has already read, by device and inode. Each of those exits is a `Failure`, which marks the search incomplete and keeps every unresolved project.
+- A parent directory the probe cannot read is a `Failure`, and the projects under it stay unresolved. The index record that retires a project is kept while a docker resource still claims it. A dry run and the apply after it therefore reach the same conclusion.
 - A file the render never reached is `Unreadable`, never a project that declares nothing. The second reading retires a live project.

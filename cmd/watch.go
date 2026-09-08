@@ -19,11 +19,10 @@ func newWatchCmd(opts *options) *cobra.Command {
 
 Docker names a project's compose files on the containers it creates and forgets
 them when those containers go. Running this keeps the record, so a stack that
-was up and then down between two cleanups is still recognised without searching
-the disk for it.
+came up and went down between two cleanups is still recognised.
 
-It is an optimisation, never a requirement: a project this misses is simply
-unresolved, and an unresolved project falls through to the filesystem search.`,
+It is an optimisation, never a requirement: a project this misses is looked for
+beside the projects docker still names, and a project found nowhere is kept.`,
 		Args:          cobra.NoArgs,
 		SilenceUsage:  true,
 		SilenceErrors: true,

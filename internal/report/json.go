@@ -18,8 +18,6 @@ type Doc struct {
 	CacheCutoff     string      `json:"build_cache_cutoff"`
 	ComposeComplete bool        `json:"compose_search_complete"`
 	ComposeFailures []string    `json:"compose_search_failures,omitempty"`
-	SkippedMounts   []string    `json:"skipped_mounts,omitempty"`
-	DirsWalked      int         `json:"directories_walked"`
 	Warnings        []string    `json:"warnings,omitempty"`
 	Containers      []Item      `json:"containers"`
 	Images          []Item      `json:"images"`
@@ -77,8 +75,6 @@ func Build(p plan.Plan, dryRun bool) Doc {
 		CacheCutoff:     p.CacheCutoff.UTC().Format("2006-01-02T15:04:05Z"),
 		ComposeComplete: p.ComposeComplete,
 		ComposeFailures: p.ComposeFailures,
-		SkippedMounts:   p.SkippedMounts,
-		DirsWalked:      p.DirsWalked,
 		Warnings:        p.Warnings,
 		Containers:      items(p.Containers),
 		Images:          items(p.Images),

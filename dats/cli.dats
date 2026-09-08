@@ -13,10 +13,7 @@ tests:
 			- "--build-cache-age"
 
 	- desc: a dry run issues no command at all
-	  cmd: 'mkdir -p {outputs.empty}; B=$(cat {shared.bin}); FAKE_DOCKER_STATE={shared.state} FAKE_DOCKER_LOG={outputs.exec.log} $B --dry-run --docker-bin dats/fixtures/fake-docker --index {outputs.index.json} --mountinfo {inputs.mountinfo} --docker-root {outputs.dockerroot}'
-	  inputs:
-		files:
-			mountinfo: "27 1 259:2 / {outputs.empty} rw,relatime shared:1 - ext4 /dev/sda1 rw\n"
+	  cmd: 'mkdir -p {outputs.empty}; B=$(cat {shared.bin}); FAKE_DOCKER_STATE={shared.state} FAKE_DOCKER_LOG={outputs.exec.log} $B --dry-run --docker-bin dats/fixtures/fake-docker --index {outputs.index.json}'
 	  outputs:
 		stdout:
 			- "DRY RUN"
@@ -31,10 +28,7 @@ tests:
 				exists: true
 
 	- desc: a run says what it is doing while it does it, on stderr, leaving stdout to the report
-	  cmd: 'mkdir -p {outputs.empty}; B=$(cat {shared.bin}); FAKE_DOCKER_STATE={shared.state} $B --dry-run --docker-bin dats/fixtures/fake-docker --index {outputs.index.json} --mountinfo {inputs.mountinfo} --docker-root {outputs.dockerroot}'
-	  inputs:
-		files:
-			mountinfo: "27 1 259:2 / {outputs.empty} rw,relatime shared:1 - ext4 /dev/sda1 rw\n"
+	  cmd: 'mkdir -p {outputs.empty}; B=$(cat {shared.bin}); FAKE_DOCKER_STATE={shared.state} $B --dry-run --docker-bin dats/fixtures/fake-docker --index {outputs.index.json}'
 	  outputs:
 		stderr:
 			- "docker-cleaner: asking docker what it holds"
@@ -48,10 +42,7 @@ tests:
 			- "docker-cleaner: reading containers"
 
 	- desc: a docker call that takes its time keeps saying so, instead of looking wedged
-	  cmd: 'mkdir -p {outputs.empty}; B=$(cat {shared.bin}); FAKE_DOCKER_STATE={shared.state} FAKE_DOCKER_STALL=7 $B --dry-run --docker-bin dats/fixtures/fake-docker --index {outputs.index.json} --mountinfo {inputs.mountinfo} --docker-root {outputs.dockerroot}'
-	  inputs:
-		files:
-			mountinfo: "27 1 259:2 / {outputs.empty} rw,relatime shared:1 - ext4 /dev/sda1 rw\n"
+	  cmd: 'mkdir -p {outputs.empty}; B=$(cat {shared.bin}); FAKE_DOCKER_STATE={shared.state} FAKE_DOCKER_STALL=7 $B --dry-run --docker-bin dats/fixtures/fake-docker --index {outputs.index.json}'
 	  outputs:
 		stdout:
 			- "DRY RUN"
@@ -59,10 +50,7 @@ tests:
 			- "reading volumes 1 to 3 of 3 ["
 
 	- desc: progress never says nothing at all
-	  cmd: 'mkdir -p {outputs.empty}; B=$(cat {shared.bin}); FAKE_DOCKER_STATE={shared.state} $B --dry-run --progress never --docker-bin dats/fixtures/fake-docker --index {outputs.index.json} --mountinfo {inputs.mountinfo} --docker-root {outputs.dockerroot}'
-	  inputs:
-		files:
-			mountinfo: "27 1 259:2 / {outputs.empty} rw,relatime shared:1 - ext4 /dev/sda1 rw\n"
+	  cmd: 'mkdir -p {outputs.empty}; B=$(cat {shared.bin}); FAKE_DOCKER_STATE={shared.state} $B --dry-run --progress never --docker-bin dats/fixtures/fake-docker --index {outputs.index.json}'
 	  outputs:
 		stdout:
 			- "DRY RUN"
@@ -77,8 +65,8 @@ tests:
 			- "--progress"
 			- "auto, always, never"
 
-	- desc: a search that runs out of time keeps every project it could not resolve
-	  cmd: 'mkdir -p {outputs.proj}; B=$(cat {shared.bin}); FAKE_DOCKER_STATE=$(dirname {inputs.version.json}) $B --dry-run --scan-timeout 1ns --docker-bin dats/fixtures/fake-docker --index {outputs.index.json} --mountinfo {inputs.mountinfo} --docker-root {outputs.dockerroot} --show-kept'
+	- desc: a project nothing has ever named a compose file for keeps its volume
+	  cmd: 'B=$(cat {shared.bin}); FAKE_DOCKER_STATE=$(dirname {inputs.version.json}) $B --dry-run --docker-bin dats/fixtures/fake-docker --index {outputs.index.json} --show-kept'
 	  inputs:
 		files:
 			version.json: '{"Client":{"Version":"29.3.1"},"Server":{"Version":"29.3.1"}}'
@@ -88,20 +76,14 @@ tests:
 			buildx_ls.json: ""
 			volume_ls.json: '{"Name":"webapp_pgdata"}'
 			volume_inspect.json: '[{"Name":"webapp_pgdata","Driver":"local","Scope":"local","Labels":{"com.docker.compose.project":"webapp"}}]'
-			mountinfo: "27 1 259:2 / {outputs.proj} rw,relatime shared:1 - ext4 /dev/sda1 rw\n"
 	  outputs:
 		stdout:
-			- "SEARCH INCOMPLETE"
-			- "COULD NOT SEARCH"
-			- "the search was incomplete"
+			- "webapp_pgdata"
 		!stdout:
 			- "VOLUMES TO REMOVE"
 
 	- desc: an apply removes exactly what the plan listed
-	  cmd: 'mkdir -p {outputs.empty}; B=$(cat {shared.bin}); FAKE_DOCKER_STATE={shared.state} FAKE_DOCKER_LOG={outputs.exec.log} $B --yes --docker-bin dats/fixtures/fake-docker --index {outputs.index.json} --mountinfo {inputs.mountinfo} --docker-root {outputs.dockerroot}'
-	  inputs:
-		files:
-			mountinfo: "27 1 259:2 / {outputs.empty} rw,relatime shared:1 - ext4 /dev/sda1 rw\n"
+	  cmd: 'mkdir -p {outputs.empty}; B=$(cat {shared.bin}); FAKE_DOCKER_STATE={shared.state} FAKE_DOCKER_LOG={outputs.exec.log} $B --yes --docker-bin dats/fixtures/fake-docker --index {outputs.index.json}'
 	  outputs:
 		files:
 			exec.log:
@@ -130,10 +112,7 @@ tests:
 			- "system df"
 
 	- desc: age reaches the selector, so a wider window keeps the recent container
-	  cmd: 'mkdir -p {outputs.empty}; B=$(cat {shared.bin}); FAKE_DOCKER_STATE={shared.state} $B --dry-run --age 90d --docker-bin dats/fixtures/fake-docker --index {outputs.index.json} --mountinfo {inputs.mountinfo} --docker-root {outputs.dockerroot}'
-	  inputs:
-		files:
-			mountinfo: "27 1 259:2 / {outputs.empty} rw,relatime shared:1 - ext4 /dev/sda1 rw\n"
+	  cmd: 'mkdir -p {outputs.empty}; B=$(cat {shared.bin}); FAKE_DOCKER_STATE={shared.state} $B --dry-run --age 90d --docker-bin dats/fixtures/fake-docker --index {outputs.index.json}'
 	  outputs:
 		stdout:
 			- "CONTAINERS TO REMOVE  (1,"
@@ -142,10 +121,7 @@ tests:
 			- "probe-recent "
 
 	- desc: the cache threshold is its own, and only it moves the prune filter
-	  cmd: 'mkdir -p {outputs.empty}; B=$(cat {shared.bin}); FAKE_DOCKER_STATE={shared.state} $B --dry-run --build-cache-age 90d --docker-bin dats/fixtures/fake-docker --index {outputs.index.json} --mountinfo {inputs.mountinfo} --docker-root {outputs.dockerroot}'
-	  inputs:
-		files:
-			mountinfo: "27 1 259:2 / {outputs.empty} rw,relatime shared:1 - ext4 /dev/sda1 rw\n"
+	  cmd: 'mkdir -p {outputs.empty}; B=$(cat {shared.bin}); FAKE_DOCKER_STATE={shared.state} $B --dry-run --build-cache-age 90d --docker-bin dats/fixtures/fake-docker --index {outputs.index.json}'
 	  outputs:
 		stdout:
 			- "buildx prune --builder default --force --filter until=2160h"
@@ -154,10 +130,7 @@ tests:
 			- "until=168h"
 
 	- desc: each step flag empties its own section
-	  cmd: 'mkdir -p {outputs.empty}; B=$(cat {shared.bin}); FAKE_DOCKER_STATE={shared.state} $B --dry-run --no-images --no-volumes --no-networks --no-build-cache --docker-bin dats/fixtures/fake-docker --index {outputs.index.json} --mountinfo {inputs.mountinfo} --docker-root {outputs.dockerroot}'
-	  inputs:
-		files:
-			mountinfo: "27 1 259:2 / {outputs.empty} rw,relatime shared:1 - ext4 /dev/sda1 rw\n"
+	  cmd: 'mkdir -p {outputs.empty}; B=$(cat {shared.bin}); FAKE_DOCKER_STATE={shared.state} $B --dry-run --no-images --no-volumes --no-networks --no-build-cache --docker-bin dats/fixtures/fake-docker --index {outputs.index.json}'
 	  outputs:
 		stdout:
 			- "CONTAINERS TO REMOVE"
@@ -168,10 +141,7 @@ tests:
 			- "BUILD CACHE"
 
 	- desc: keep pins an image the age rule would have taken
-	  cmd: 'mkdir -p {outputs.empty}; B=$(cat {shared.bin}); FAKE_DOCKER_STATE={shared.state} $B --dry-run --keep "myapp:*" --docker-bin dats/fixtures/fake-docker --index {outputs.index.json} --mountinfo {inputs.mountinfo} --docker-root {outputs.dockerroot}'
-	  inputs:
-		files:
-			mountinfo: "27 1 259:2 / {outputs.empty} rw,relatime shared:1 - ext4 /dev/sda1 rw\n"
+	  cmd: 'mkdir -p {outputs.empty}; B=$(cat {shared.bin}); FAKE_DOCKER_STATE={shared.state} $B --dry-run --keep "myapp:*" --docker-bin dats/fixtures/fake-docker --index {outputs.index.json}'
 	  outputs:
 		stdout:
 			- "matches --keep"
@@ -179,10 +149,7 @@ tests:
 			- "myapp:v1  "
 
 	- desc: json carries the literal argv of every planned command
-	  cmd: 'mkdir -p {outputs.empty}; B=$(cat {shared.bin}); FAKE_DOCKER_STATE={shared.state} FAKE_DOCKER_LOG={outputs.exec.log} $B --json --dry-run --docker-bin dats/fixtures/fake-docker --index {outputs.index.json} --mountinfo {inputs.mountinfo} --docker-root {outputs.dockerroot}'
-	  inputs:
-		files:
-			mountinfo: "27 1 259:2 / {outputs.empty} rw,relatime shared:1 - ext4 /dev/sda1 rw\n"
+	  cmd: 'mkdir -p {outputs.empty}; B=$(cat {shared.bin}); FAKE_DOCKER_STATE={shared.state} FAKE_DOCKER_LOG={outputs.exec.log} $B --json --dry-run --docker-bin dats/fixtures/fake-docker --index {outputs.index.json}'
 	  outputs:
 		stdout:
 			- '"dry_run": true'
@@ -227,11 +194,8 @@ tests:
 				exists: true
 
 	- desc: nothing can answer a prompt with no terminal, so the run refuses
-	  cmd: 'mkdir -p {outputs.empty}; B=$(cat {shared.bin}); FAKE_DOCKER_STATE={shared.state} FAKE_DOCKER_LOG={outputs.exec.log} $B --docker-bin dats/fixtures/fake-docker --index {outputs.index.json} --mountinfo {inputs.mountinfo} --docker-root {outputs.dockerroot}'
+	  cmd: 'mkdir -p {outputs.empty}; B=$(cat {shared.bin}); FAKE_DOCKER_STATE={shared.state} FAKE_DOCKER_LOG={outputs.exec.log} $B --docker-bin dats/fixtures/fake-docker --index {outputs.index.json}'
 	  exit: 2
-	  inputs:
-		files:
-			mountinfo: "27 1 259:2 / {outputs.empty} rw,relatime shared:1 - ext4 /dev/sda1 rw\n"
 	  outputs:
 		stderr:
 			- "refusing to prompt with no terminal"
@@ -240,11 +204,8 @@ tests:
 				exists: true
 
 	- desc: a container that would not go keeps the image it holds
-	  cmd: 'mkdir -p {outputs.empty}; B=$(cat {shared.bin}); FAKE_DOCKER_STATE={shared.state} FAKE_DOCKER_LOG={outputs.exec.log} FAKE_DOCKER_FAIL="rm c1" $B --yes --docker-bin dats/fixtures/fake-docker --index {outputs.index.json} --mountinfo {inputs.mountinfo} --docker-root {outputs.dockerroot}'
+	  cmd: 'mkdir -p {outputs.empty}; B=$(cat {shared.bin}); FAKE_DOCKER_STATE={shared.state} FAKE_DOCKER_LOG={outputs.exec.log} FAKE_DOCKER_FAIL="rm c1" $B --yes --docker-bin dats/fixtures/fake-docker --index {outputs.index.json}'
 	  exit: 1
-	  inputs:
-		files:
-			mountinfo: "27 1 259:2 / {outputs.empty} rw,relatime shared:1 - ext4 /dev/sda1 rw\n"
 	  outputs:
 		stdout:
 			- "FAILED   docker rm c1"
@@ -257,7 +218,7 @@ tests:
 					- "rmi myapp:v1"
 
 	- desc: a stack that is down keeps its volume while its compose file exists
-	  cmd: 'mkdir -p {outputs.proj}; cp {inputs.docker-compose.yml} {outputs.proj}/docker-compose.yml; B=$(cat {shared.bin}); FAKE_DOCKER_STATE=$(dirname {inputs.version.json}) $B --dry-run --docker-bin dats/fixtures/fake-docker --index {outputs.index.json} --mountinfo {inputs.mountinfo} --docker-root {outputs.dockerroot} --show-kept'
+	  cmd: 'mkdir -p {outputs.proj}/webapp; cp {inputs.docker-compose.yml} {outputs.proj}/webapp/docker-compose.yml; cp {inputs.seed.json} {outputs.index.json}; B=$(cat {shared.bin}); FAKE_DOCKER_STATE=$(dirname {inputs.version.json}) $B --dry-run --docker-bin dats/fixtures/fake-docker --index {outputs.index.json} --show-kept'
 	  inputs:
 		files:
 			version.json: '{"Client":{"Version":"29.3.1"},"Server":{"Version":"29.3.1"}}'
@@ -269,17 +230,17 @@ tests:
 			volume_inspect.json: '[{"Name":"webapp_pgdata","Driver":"local","Scope":"local","Labels":{"com.docker.compose.project":"webapp"}}]'
 			compose_config.json: '{"name":"webapp","services":{"db":{"image":"postgres:16"}},"volumes":{"pgdata":{"name":"webapp_pgdata"}}}'
 			docker-compose.yml: "services:\n  db:\n    image: postgres:16\n"
-			mountinfo: "27 1 259:2 / {outputs.proj} rw,relatime shared:1 - ext4 /dev/sda1 rw\n"
+			seed.json: '{"schema":1,"projects":{"webapp":{"files":["{outputs.proj}/webapp/docker-compose.yml"],"seen":"2026-01-01T00:00:00Z"}}}'
 	  outputs:
 		stdout:
-			- "search complete"
+			- "resolved from docker"
 			- "webapp_pgdata"
 			- "claimed by a compose project still on disk"
 		!stdout:
 			- "VOLUMES TO REMOVE"
 
 	- desc: deleting the compose file is what retires the project
-	  cmd: 'mkdir -p {outputs.proj}; B=$(cat {shared.bin}); FAKE_DOCKER_STATE=$(dirname {inputs.version.json}) $B --dry-run --docker-bin dats/fixtures/fake-docker --index {outputs.index.json} --mountinfo {inputs.mountinfo} --docker-root {outputs.dockerroot}'
+	  cmd: 'mkdir -p {outputs.proj}; cp {inputs.seed.json} {outputs.index.json}; B=$(cat {shared.bin}); FAKE_DOCKER_STATE=$(dirname {inputs.version.json}) $B --dry-run --docker-bin dats/fixtures/fake-docker --index {outputs.index.json}'
 	  inputs:
 		files:
 			version.json: '{"Client":{"Version":"29.3.1"},"Server":{"Version":"29.3.1"}}'
@@ -289,35 +250,15 @@ tests:
 			buildx_ls.json: ""
 			volume_ls.json: '{"Name":"webapp_pgdata"}'
 			volume_inspect.json: '[{"Name":"webapp_pgdata","Driver":"local","Scope":"local","Labels":{"com.docker.compose.project":"webapp"}}]'
-			mountinfo: "27 1 259:2 / {outputs.proj} rw,relatime shared:1 - ext4 /dev/sda1 rw\n"
+			seed.json: '{"schema":1,"projects":{"webapp":{"files":["{outputs.proj}/webapp/docker-compose.yml"],"seen":"2026-01-01T00:00:00Z"}}}'
 	  outputs:
 		stdout:
-			- "search complete"
+			- "resolved from docker"
 			- "VOLUMES TO REMOVE"
 			- "webapp_pgdata"
 
-	- desc: a search that could not run everywhere keeps the volume instead
-	  cmd: 'B=$(cat {shared.bin}); FAKE_DOCKER_STATE=$(dirname {inputs.version.json}) $B --dry-run --docker-bin dats/fixtures/fake-docker --index {outputs.index.json} --mountinfo {inputs.mountinfo} --docker-root {outputs.dockerroot} --show-kept'
-	  inputs:
-		files:
-			version.json: '{"Client":{"Version":"29.3.1"},"Server":{"Version":"29.3.1"}}'
-			ps.txt: ""
-			image_ls.json: ""
-			network_ls.json: ""
-			buildx_ls.json: ""
-			volume_ls.json: '{"Name":"webapp_pgdata"}'
-			volume_inspect.json: '[{"Name":"webapp_pgdata","Driver":"local","Scope":"local","Labels":{"com.docker.compose.project":"webapp"}}]'
-			mountinfo: "27 1 259:2 / {outputs.never-mounted} rw,relatime shared:1 - ext4 /dev/sda1 rw\n"
-	  outputs:
-		stdout:
-			- "SEARCH INCOMPLETE"
-			- "COULD NOT SEARCH"
-			- "the search was incomplete"
-		!stdout:
-			- "VOLUMES TO REMOVE"
-
-	- desc: a project the index already knows costs no walk
-	  cmd: 'mkdir -p {outputs.proj}; cp {inputs.docker-compose.yml} {outputs.proj}/docker-compose.yml; B=$(cat {shared.bin}); S=$(dirname {inputs.version.json}); FAKE_DOCKER_STATE=$S $B --dry-run --docker-bin dats/fixtures/fake-docker --index {outputs.index.json} --mountinfo {inputs.mountinfo} --docker-root {outputs.dockerroot} > {outputs.first.txt}; FAKE_DOCKER_STATE=$S $B --dry-run --docker-bin dats/fixtures/fake-docker --index {outputs.index.json} --mountinfo {inputs.mountinfo} --docker-root {outputs.dockerroot}'
+	- desc: a project is found beside the ones docker names, without reading the disk at large
+	  cmd: 'mkdir -p {outputs.proj}/webapp {outputs.proj}/other; cp {inputs.docker-compose.yml} {outputs.proj}/webapp/docker-compose.yml; cp {inputs.docker-compose.yml} {outputs.proj}/other/docker-compose.yml; cp {inputs.seed.json} {outputs.index.json}; B=$(cat {shared.bin}); FAKE_DOCKER_STATE=$(dirname {inputs.version.json}) $B --dry-run --docker-bin dats/fixtures/fake-docker --index {outputs.index.json} --show-kept'
 	  inputs:
 		files:
 			version.json: '{"Client":{"Version":"29.3.1"},"Server":{"Version":"29.3.1"}}'
@@ -329,13 +270,31 @@ tests:
 			volume_inspect.json: '[{"Name":"webapp_pgdata","Driver":"local","Scope":"local","Labels":{"com.docker.compose.project":"webapp"}}]'
 			compose_config.json: '{"name":"webapp","volumes":{"pgdata":{"name":"webapp_pgdata"}}}'
 			docker-compose.yml: "services:\n  db:\n    image: postgres:16\n"
-			mountinfo: "27 1 259:2 / {outputs.proj} rw,relatime shared:1 - ext4 /dev/sda1 rw\n"
+			seed.json: '{"schema":1,"projects":{"other":{"files":["{outputs.proj}/other/docker-compose.yml"],"seen":"2026-01-01T00:00:00Z"}}}'
 	  outputs:
 		stdout:
-			- "0 directories walked"
+			- "claimed by a compose project still on disk"
+		!stdout:
+			- "VOLUMES TO REMOVE"
+
+	- desc: what a run learns about a project it writes down for the next one
+	  cmd: 'mkdir -p {outputs.proj}/webapp {outputs.proj}/other; cp {inputs.docker-compose.yml} {outputs.proj}/webapp/docker-compose.yml; cp {inputs.docker-compose.yml} {outputs.proj}/other/docker-compose.yml; cp {inputs.seed.json} {outputs.index.json}; B=$(cat {shared.bin}); FAKE_DOCKER_STATE=$(dirname {inputs.version.json}) $B --dry-run --docker-bin dats/fixtures/fake-docker --index {outputs.index.json}'
+	  inputs:
+		files:
+			version.json: '{"Client":{"Version":"29.3.1"},"Server":{"Version":"29.3.1"}}'
+			ps.txt: ""
+			image_ls.json: ""
+			network_ls.json: ""
+			buildx_ls.json: ""
+			volume_ls.json: '{"Name":"webapp_pgdata"}'
+			volume_inspect.json: '[{"Name":"webapp_pgdata","Driver":"local","Scope":"local","Labels":{"com.docker.compose.project":"webapp"}}]'
+			compose_config.json: '{"name":"webapp","volumes":{"pgdata":{"name":"webapp_pgdata"}}}'
+			docker-compose.yml: "services:\n  db:\n    image: postgres:16\n"
+			seed.json: '{"schema":1,"projects":{"other":{"files":["{outputs.proj}/other/docker-compose.yml"],"seen":"2026-01-01T00:00:00Z"}}}'
+	  outputs:
 		!stdout:
 			- "VOLUMES TO REMOVE"
 		files:
 			index.json:
 				match:
-					- "webapp"
+					- "webapp/docker-compose.yml"

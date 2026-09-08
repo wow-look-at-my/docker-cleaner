@@ -39,8 +39,8 @@ func TestEveryFlagIsDocumented(t *testing.T) {
 	for _, flag := range []string{
 		"--dry-run", "--age", "--build-cache-age", "--yes", "--no-containers",
 		"--no-images", "--no-volumes", "--no-networks", "--no-build-cache",
-		"--keep", "--json", "--show-kept", "--rescan", "--docker-bin",
-		"--timeout", "--index", "--mountinfo", "--docker-root",
+		"--keep", "--json", "--show-kept", "--docker-bin",
+		"--timeout", "--index", "--progress",
 	} {
 		assert.Contains(t, got, flag)
 	}

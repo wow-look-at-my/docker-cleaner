@@ -24,7 +24,7 @@ var doc = template.Must(template.New("report").Funcs(template.FuncMap{
 }).Parse(`docker-cleaner{{if .DryRun}}   DRY RUN{{end}}
 containers offline over {{age .Plan.Age}} (before {{cutoff .Plan}})
 build cache unused over {{age .Plan.BuildCacheAge}} (before {{cacheCutoff .Plan}})
-compose projects: {{.Completeness}}, {{.Plan.DirsWalked}} directories walked
+compose projects: {{.Completeness}}
 {{- if .Before}}
 
 BEFORE
@@ -115,9 +115,9 @@ func Text(w io.Writer, p plan.Plan, before string, dryRun, showKept bool) error 
 // file found" was allowed to mean "the project was deleted".
 func completeness(p plan.Plan) string {
 	if p.ComposeComplete {
-		return "search complete"
+		return "resolved from docker"
 	}
-	return "SEARCH INCOMPLETE, so unresolved projects were kept"
+	return "NOT FULLY RESOLVED, so unresolved projects were kept"
 }
 
 // keptLines groups by reason so common cases read as a line, while
