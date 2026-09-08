@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -20,7 +21,19 @@ func write(t *testing.T, path string) {
 	require.NoError(t, os.WriteFile(path, nil, 0o644))
 }
 
-// configRunner answers `docker compose config` with a project per file.
+// renderedFiles is the argv's `-f` values, joined, so a fake can answer a whole
+// file set the way compose does.
+func renderedFiles(args []string) string {
+	var files []string
+	for i := 0; i+1 < len(args); i++ {
+		if args[i] == "-f" {
+			files = append(files, args[i+1])
+		}
+	}
+	return strings.Join(files, ",")
+}
+
+// configRunner answers `docker compose config` with a project per file set.
 type configRunner struct {
 	byFile map[string]string
 	fail   map[string]string
@@ -29,7 +42,7 @@ type configRunner struct {
 
 func (r *configRunner) Run(_ context.Context, args ...string) ([]byte, []byte, error) {
 	r.calls++
-	file := args[2]
+	file := renderedFiles(args)
 	if msg, bad := r.fail[file]; bad {
 		return nil, []byte(msg), errors.New("exit status 1")
 	}

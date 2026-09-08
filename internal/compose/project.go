@@ -54,14 +54,18 @@ type Claims struct {
 // renderWorkers bounds the `docker compose config` processes a render forks.
 const renderWorkers = 8
 
-// Resolve renders every compose file into its claims. Files that name the same
-// project are merged, because a directory holding both compose.yaml and
-// docker-compose.yml is the same project described by both files.
+// Resolve renders each project's whole file set into its claims. A set is
+// every file compose itself used, in compose's own order.
 //
-// Files render together, and the results are merged in file order, so the
+// The set renders in a single call, because that is the only way to see the
+// project compose builds. `-f` turns off the automatic merge of an override
+// beside the base file, so a base file rendered alone declares none of what its
+// override adds, and an override rendered alone is not a project at all.
+//
+// The sets render together, and the results are merged in set order, so the
 // claims never depend on the order the renders finished in. A cancelled context
-// leaves the rest unread, which the caller reports as an incomplete search.
-func Resolve(ctx context.Context, r dockercli.Runner, files []string, p *progress.Reporter) *Claims {
+// leaves the rest unread, which the caller reports as unresolved.
+func Resolve(ctx context.Context, r dockercli.Runner, sets [][]string, p *progress.Reporter) *Claims {
 	c := &Claims{
 		Projects:   map[string]*Project{},
 		Unreadable: map[string]string{},
@@ -70,16 +74,16 @@ func Resolve(ctx context.Context, r dockercli.Runner, files []string, p *progres
 		networks:   map[string]string{},
 	}
 
-	for i, rendered := range renderAll(ctx, r, files, p) {
+	for i, rendered := range renderAll(ctx, r, sets, p) {
 		if rendered.err != nil {
-			c.Unreadable[files[i]] = rendered.err.Error()
+			c.Unreadable[strings.Join(sets[i], " with ")] = rendered.err.Error()
 			continue
 		}
-		c.add(files[i], rendered.cfg)
+		c.add(sets[i], rendered.cfg)
 	}
 
 	for _, p := range c.Projects {
-		sort.Strings(p.Files)
+		// Files keep compose's order: a later file overrides what precedes it.
 		sort.Strings(p.Images)
 		sort.Strings(p.Volumes)
 		sort.Strings(p.Networks)
@@ -96,9 +100,9 @@ type rendered struct {
 // renderAll renders the files together and returns a result per file, in the
 // order the files were given. A file nothing reached carries an error, so a
 // search cut short can never read as "this project declares nothing".
-func renderAll(ctx context.Context, r dockercli.Runner, files []string, p *progress.Reporter) []rendered {
-	out := make([]rendered, len(files))
-	if len(files) == 0 {
+func renderAll(ctx context.Context, r dockercli.Runner, sets [][]string, p *progress.Reporter) []rendered {
+	out := make([]rendered, len(sets))
+	if len(sets) == 0 {
 		return out
 	}
 	for i := range out {
@@ -107,23 +111,23 @@ func renderAll(ctx context.Context, r dockercli.Runner, files []string, p *progr
 
 	var done atomic.Int64
 	p.Detail(func() string {
-		return fmt.Sprintf("(%d of %d)", done.Load(), len(files))
+		return fmt.Sprintf("(%d of %d)", done.Load(), len(sets))
 	})
 	defer p.Detail(nil)
 
 	work := make(chan int)
 	var wg sync.WaitGroup
-	for range min(renderWorkers, len(files)) {
+	for range min(renderWorkers, len(sets)) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			for i := range work {
-				out[i].cfg, out[i].err = render(ctx, r, files[i])
+				out[i].cfg, out[i].err = render(ctx, r, sets[i])
 				done.Add(1)
 			}
 		}()
 	}
-	for i := range files {
+	for i := range sets {
 		select {
 		case work <- i:
 		case <-ctx.Done():
@@ -137,9 +141,14 @@ func renderAll(ctx context.Context, r dockercli.Runner, files []string, p *progr
 	return out
 }
 
-func render(ctx context.Context, r dockercli.Runner, file string) (config, error) {
+func render(ctx context.Context, r dockercli.Runner, files []string) (config, error) {
 	var cfg config
-	out, errb, err := r.Run(ctx, "compose", "-f", file, "config", "--format", "json")
+	args := []string{"compose"}
+	for _, f := range files {
+		args = append(args, "-f", f)
+	}
+	args = append(args, "config", "--format", "json")
+	out, errb, err := r.Run(ctx, args...)
 	if err != nil {
 		msg := strings.TrimSpace(string(errb))
 		if i := strings.IndexByte(msg, '\n'); i >= 0 {
@@ -159,13 +168,15 @@ func render(ctx context.Context, r dockercli.Runner, file string) (config, error
 	return cfg, nil
 }
 
-func (c *Claims) add(file string, cfg config) {
+func (c *Claims) add(files []string, cfg config) {
 	p := c.Projects[cfg.Name]
 	if p == nil {
 		p = &Project{Name: cfg.Name}
 		c.Projects[cfg.Name] = p
 	}
-	p.Files = append(p.Files, file)
+	for _, f := range files {
+		p.Files = appendNew(p.Files, f)
+	}
 
 	for _, svc := range cfg.Services {
 		if svc.Image == "" {

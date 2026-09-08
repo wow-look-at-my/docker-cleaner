@@ -49,6 +49,11 @@ case "$*" in
 "image inspect "*) emit image_inspect.json ;;
 "network inspect "*) emit network_inspect.json ;;
 "buildx du --builder "*) emit "buildx_du_$4.json" ;;
+"compose -f "*" -f "*)
+	# Compose merges the whole set. A fixture per shape is how the suite tells
+	# a merged render from a base file rendered on its own.
+	emit compose_config_merged.json
+	;;
 "compose -f "*)
 	if [ -f "$state/compose_config.json" ]; then
 		emit compose_config.json

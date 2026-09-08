@@ -61,6 +61,42 @@ func TestRecordUnionsFilesAndIgnoresJunk(t *testing.T) {
 	assert.Len(t, idx.Projects, 1)
 }
 
+// The order compose gave decides which file wins, so the index must not sort
+// them: an override sorts ahead of the base file it is meant to override.
+func TestRecordKeepsComposesFileOrder(t *testing.T) {
+	idx := LoadIndex(filepath.Join(t.TempDir(), "projects.json"))
+	files := []string{"/srv/app/docker-compose.yml", "/srv/app/docker-compose.override.yml"}
+
+	idx.Record("webapp", files, seen)
+
+	assert.Equal(t, files, idx.Projects["webapp"].Files)
+}
+
+// An index written by a version that sorted the paths holds an override ahead
+// of its base. The next run says what compose says, so the record is repaired
+// rather than carried forward.
+func TestARecordWrittenOutOfOrderIsRepaired(t *testing.T) {
+	idx := LoadIndex(filepath.Join(t.TempDir(), "projects.json"))
+	base := "/srv/app/docker-compose.yml"
+	over := "/srv/app/docker-compose.override.yml"
+	idx.Projects["webapp"] = Entry{Files: []string{over, base}, Seen: seen}
+
+	idx.Record("webapp", []string{base, over}, seen)
+
+	assert.Equal(t, []string{base, over}, idx.Projects["webapp"].Files)
+}
+
+// A path only the older record knew is kept, so a file compose no longer names
+// is still stat'ed before the project is called gone.
+func TestRecordKeepsAPathOnlyTheOlderRecordNamed(t *testing.T) {
+	idx := LoadIndex(filepath.Join(t.TempDir(), "projects.json"))
+	idx.Record("webapp", []string{"/srv/app/compose.yaml", "/srv/app/extra.yaml"}, seen)
+
+	idx.Record("webapp", []string{"/srv/app/compose.yaml"}, seen)
+
+	assert.Equal(t, []string{"/srv/app/compose.yaml", "/srv/app/extra.yaml"}, idx.Projects["webapp"].Files)
+}
+
 func TestForgetDropsAProject(t *testing.T) {
 	idx := LoadIndex(filepath.Join(t.TempDir(), "projects.json"))
 	idx.Record("webapp", []string{"/a/compose.yaml"}, seen)

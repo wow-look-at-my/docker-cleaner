@@ -217,6 +217,29 @@ tests:
 				notMatch:
 					- "rmi myapp:v1"
 
+	- desc: a volume an override declares belongs to the project, so it is never collected
+	  cmd: 'mkdir -p {outputs.proj}/webapp; cp {inputs.docker-compose.yml} {outputs.proj}/webapp/docker-compose.yml; cp {inputs.docker-compose.override.yml} {outputs.proj}/webapp/docker-compose.override.yml; cp {inputs.seed.json} {outputs.index.json}; B=$(cat {shared.bin}); FAKE_DOCKER_STATE=$(dirname {inputs.version.json}) $B --dry-run --docker-bin dats/fixtures/fake-docker --index {outputs.index.json} --show-kept'
+	  inputs:
+		files:
+			version.json: '{"Client":{"Version":"29.3.1"},"Server":{"Version":"29.3.1"}}'
+			ps.txt: ""
+			image_ls.json: ""
+			network_ls.json: ""
+			buildx_ls.json: ""
+			volume_ls.json: "{\"Name\":\"webapp_pgdata\"}\n{\"Name\":\"webapp_extra\"}"
+			volume_inspect.json: '[{"Name":"webapp_pgdata","Driver":"local","Scope":"local","Labels":{"com.docker.compose.project":"webapp"}},{"Name":"webapp_extra","Driver":"local","Scope":"local","Labels":{"com.docker.compose.project":"webapp"}}]'
+			compose_config.json: '{"name":"webapp","services":{"db":{"image":"postgres:16"}},"volumes":{"pgdata":{"name":"webapp_pgdata"}}}'
+			compose_config_merged.json: '{"name":"webapp","services":{"db":{"image":"postgres:16"}},"volumes":{"pgdata":{"name":"webapp_pgdata"},"extra":{"name":"webapp_extra"}}}'
+			docker-compose.yml: "services:\n  db:\n    image: postgres:16\n"
+			docker-compose.override.yml: "volumes:\n  extra: {}\n"
+			seed.json: '{"schema":1,"projects":{"webapp":{"files":["{outputs.proj}/webapp/docker-compose.yml","{outputs.proj}/webapp/docker-compose.override.yml"],"seen":"2026-01-01T00:00:00Z"}}}'
+	  outputs:
+		stdout:
+			- "webapp_extra"
+			- "claimed by a compose project still on disk"
+		!stdout:
+			- "VOLUMES TO REMOVE"
+
 	- desc: a stack that is down keeps its volume while its compose file exists
 	  cmd: 'mkdir -p {outputs.proj}/webapp; cp {inputs.docker-compose.yml} {outputs.proj}/webapp/docker-compose.yml; cp {inputs.seed.json} {outputs.index.json}; B=$(cat {shared.bin}); FAKE_DOCKER_STATE=$(dirname {inputs.version.json}) $B --dry-run --docker-bin dats/fixtures/fake-docker --index {outputs.index.json} --show-kept'
 	  inputs:

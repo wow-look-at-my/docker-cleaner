@@ -45,17 +45,18 @@ func (s *slowRunner) Run(ctx context.Context, args ...string) ([]byte, []byte, e
 	return []byte(project(args[2])), nil, nil
 }
 
-func manyFiles(n int) []string {
-	var files []string
+// manyFiles is a project per file, which is the ordinary shape.
+func manyFiles(n int) [][]string {
+	var sets [][]string
 	for i := range n {
-		files = append(files, "/srv/p"+strconv.Itoa(i)+"/compose.yaml")
+		sets = append(sets, []string{"/srv/p" + strconv.Itoa(i) + "/compose.yaml"})
 	}
-	return files
+	return sets
 }
 
-// Each file costs a docker invocation. In order, a machine full of projects
+// Each project costs a docker invocation. In order, a machine full of projects
 // spends the whole run here, in silence.
-func TestFilesRenderTogether(t *testing.T) {
+func TestProjectsRenderTogether(t *testing.T) {
 	r := &slowRunner{delay: 20 * time.Millisecond}
 
 	c := Resolve(context.Background(), r, manyFiles(16), nil)
@@ -70,11 +71,11 @@ func TestFilesRenderTogether(t *testing.T) {
 // The claims decide what gets deleted, so they must not depend on the order the
 // renders finished in.
 func TestRenderOrderDoesNotChangeTheClaims(t *testing.T) {
-	files := manyFiles(12)
+	sets := manyFiles(12)
 
-	want := Resolve(context.Background(), &slowRunner{}, files, nil)
+	want := Resolve(context.Background(), &slowRunner{}, sets, nil)
 	for range 5 {
-		got := Resolve(context.Background(), &slowRunner{delay: time.Millisecond}, files, nil)
+		got := Resolve(context.Background(), &slowRunner{delay: time.Millisecond}, sets, nil)
 		assert.Equal(t, want.Projects, got.Projects)
 	}
 }

@@ -29,7 +29,7 @@ const webappProject = `{
 func liveProject(t *testing.T) *compose.Discovery {
 	t.Helper()
 	claims := compose.Resolve(context.Background(), composeRunner{webappProject},
-		[]string{"/srv/webapp/compose.yaml"}, nil)
+		[][]string{{"/srv/webapp/compose.yaml"}}, nil)
 	return &compose.Discovery{Claims: claims, Complete: true}
 }
 
