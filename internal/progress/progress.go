@@ -111,6 +111,7 @@ func (r *Reporter) Stage(format string, args ...any) {
 	r.detail = nil
 	r.started = r.now()
 	r.total, r.finished = 0, 0
+	r.restart()
 	r.mu.Unlock()
 	r.render()
 }
@@ -160,18 +161,12 @@ func (r *Reporter) Detail(f func() string) {
 }
 
 // Stop clears the line and ends the reporter. A repeat call does nothing, so a
-// deferred Stop is safe beside an explicit call.
+// deferred Stop is safe beside an explicit call. A later Stage starts it again,
+// because a run still has slow work to narrate after it prints its report.
 func (r *Reporter) Stop() {
 	if r == nil {
 		return
 	}
-	r.mu.Lock()
-	if r.stage == "" && !r.dirty {
-		r.mu.Unlock()
-		return
-	}
-	r.mu.Unlock()
-
 	select {
 	case <-r.done:
 	default:
@@ -185,8 +180,20 @@ func (r *Reporter) Stop() {
 		fmt.Fprint(r.w, "\r\033[K")
 		r.dirty = false
 	}
-	r.stage = ""
-	r.drawn = ""
+	r.stage, r.drawn = "", ""
+	r.running = map[int]step{}
+	r.total, r.finished = 0, 0
+}
+
+// restart brings the draw loop back after a Stop. The caller holds the lock.
+func (r *Reporter) restart() {
+	select {
+	case <-r.done:
+	default:
+		return // still running
+	}
+	r.stop, r.done = make(chan struct{}), make(chan struct{})
+	go r.loop()
 }
 
 func (r *Reporter) render() {

@@ -83,14 +83,16 @@ func Do(ctx context.Context, c Config) int {
 
 	_, failed := apply(ctx, c, p, c.Stdout)
 
-	// Measuring again walks every volume, so the run says so.
-	fmt.Fprintln(c.Stderr, "docker-cleaner: measuring disk usage again")
+	// Measuring again walks every volume, the slowest thing docker does.
+	c.Progress.Stage("measuring disk usage again")
+	out, _, err := c.Runner.Run(ctx, "system", "df", "-v", "--format", "json")
+	// The line goes before the table does, so the report keeps the screen.
+	c.Progress.Stop()
+
 	var after dockercli.DiskUsage
-	if out, _, err := c.Runner.Run(ctx, "system", "df", "-v", "--format", "json"); err == nil {
-		if json.Unmarshal(out, &after) == nil {
-			fmt.Fprintln(c.Stdout, "\nAFTER")
-			fmt.Fprintln(c.Stdout, strings.TrimRight(dockercli.Summary(after), "\n"))
-		}
+	if err == nil && json.Unmarshal(out, &after) == nil {
+		fmt.Fprintln(c.Stdout, "\nAFTER")
+		fmt.Fprintln(c.Stdout, strings.TrimRight(dockercli.Summary(after), "\n"))
 	}
 	if failed > 0 {
 		return ExitApplyFailed

@@ -208,6 +208,26 @@ func TestTheLineNamesTheStepStillRunning(t *testing.T) {
 	assert.Equal(t, before, out.String(), "a phase between steps draws nothing")
 }
 
+// The report takes the screen mid-run, and the measurement after an apply is
+// slow enough to look wedged. So a stage after a Stop has to draw again.
+func TestAStageAfterAStopDrawsAgain(t *testing.T) {
+	t.Parallel()
+
+	var out safeBuffer
+	clk := &fakeClock{at: time.Unix(1700000000, 0)}
+	r := newClocked(&out, true, 80, clk.now)
+	defer r.Stop()
+
+	r.Stage("deciding what to remove")
+	r.Stop()
+
+	r.Stage("measuring disk usage again")
+	clk.advance(40 * time.Second)
+	require.Eventually(t, func() bool {
+		return strings.Contains(out.String(), "measuring disk usage again [40s]")
+	}, 10*time.Second, 20*time.Millisecond)
+}
+
 func TestTheClockReadsAsTime(t *testing.T) {
 	assert.Equal(t, "[0s]", clock(400*time.Millisecond))
 	assert.Equal(t, "[9s]", clock(9*time.Second))
