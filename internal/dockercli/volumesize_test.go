@@ -67,6 +67,17 @@ func TestAnUnreadableVolumeIsAbsentRatherThanEmpty(t *testing.T) {
 	assert.Contains(t, sizes, "real")
 }
 
+// The steps a measurement reports have to be the volumes it will walk. Counting
+// a volume with no directory leaves the fraction short of its own end.
+func TestOnlyAVolumeWithADirectoryIsCounted(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, 1, Measurable([]Volume{
+		{Name: "remote", Mountpoint: ""},
+		{Name: "local", Mountpoint: "/var/lib/docker/volumes/local/_data"},
+	}))
+}
+
 // An interrupt has to reach the walk, which means watching the context rather
 // than working through every volume.
 func TestMeasuringStopsWhenTheContextEnds(t *testing.T) {

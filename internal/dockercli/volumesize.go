@@ -13,6 +13,17 @@ import (
 // sizeWorkers walk separate volumes at the same time.
 const sizeWorkers = 8
 
+// Measurable is how many of these volumes have a directory to walk.
+func Measurable(volumes []Volume) int {
+	n := 0
+	for _, v := range volumes {
+		if v.Mountpoint != "" {
+			n++
+		}
+	}
+	return n
+}
+
 // MeasureVolumes returns the bytes each volume holds, by walking the directory
 // its driver mounts.
 //

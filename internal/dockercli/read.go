@@ -120,7 +120,8 @@ func measure(ctx context.Context, s Snapshot, p *progress.Reporter) DiskUsage {
 		du.BuildCache = append(du.BuildCache, cache.Records...)
 	}
 
-	p.Steps(len(s.Volumes))
+	// Counting a volume that is never walked leaves the fraction short.
+	p.Steps(Measurable(s.Volumes))
 	sizes := MeasureVolumes(ctx, s.Volumes, p)
 	for _, v := range s.Volumes {
 		n, ok := sizes[v.Name]
