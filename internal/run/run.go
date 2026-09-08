@@ -5,6 +5,7 @@ package run
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -81,10 +82,15 @@ func Do(ctx context.Context, c Config) int {
 	}
 
 	_, failed := apply(ctx, c, p, c.Stdout)
-	after, _, _ := c.Runner.Run(ctx, "system", "df")
-	if len(after) > 0 {
-		fmt.Fprintln(c.Stdout, "\nAFTER")
-		fmt.Fprintln(c.Stdout, strings.TrimRight(string(after), "\n"))
+
+	// Measuring again walks every volume, so the run says so.
+	fmt.Fprintln(c.Stderr, "docker-cleaner: measuring disk usage again")
+	var after dockercli.DiskUsage
+	if out, _, err := c.Runner.Run(ctx, "system", "df", "-v", "--format", "json"); err == nil {
+		if json.Unmarshal(out, &after) == nil {
+			fmt.Fprintln(c.Stdout, "\nAFTER")
+			fmt.Fprintln(c.Stdout, strings.TrimRight(dockercli.Summary(after), "\n"))
+		}
 	}
 	if failed > 0 {
 		return ExitApplyFailed

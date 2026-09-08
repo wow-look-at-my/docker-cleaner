@@ -5,21 +5,45 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/wow-look-at-my/docker-cleaner/internal/progress"
 	"github.com/wow-look-at-my/go-containers/set"
 )
 
+// listing is what the cheap enumerations found. The rest of the read is a call
+// per batch of these, which is where the step count comes from.
+type listing struct {
+	containers []string
+	images     []string
+	volumes    []string
+	networks   []string
+	builders   []Builder
+}
+
+// steps is how many calls the counted part of the read still has to make. The
+// trailing call is the disk-usage pass.
+func (l listing) steps() int {
+	return batches(len(l.containers)) + batches(len(l.images)) +
+		batches(len(l.volumes)) + batches(len(l.networks)) +
+		len(l.builders) + 1
+}
+
+// batches is how many inspect calls a set of ids takes.
+func batches(n int) int {
+	return (n + inspectChunk - 1) / inspectChunk
+}
+
 // Read gathers every fact the selector needs. A read that cannot complete is
 // fatal: a partial read produces a confident, wrong plan.
 //
-// Every step names itself on the reporter. `docker system df -v` alone takes
-// tens of seconds on a full machine, and a caller that says nothing for that
-// long looks wedged.
+// The order is deliberate. Every enumeration is cheap and says how much work
+// the rest of the read is, so the run reports a true fraction rather than a
+// clock. The slow disk-usage pass goes last.
 func Read(ctx context.Context, r Runner, p *progress.Reporter) (Snapshot, error) {
 	var s Snapshot
 
-	p.Stage("asking docker for its version")
+	p.Stage("asking docker what it holds")
 	if err := runJSON(ctx, r, &s.Version, "version", "--format", "json"); err != nil {
 		return s, err
 	}
@@ -27,113 +51,125 @@ func Read(ctx context.Context, r Runner, p *progress.Reporter) (Snapshot, error)
 		return s, errors.New("docker daemon is not reachable")
 	}
 
-	p.Stage("reading disk usage")
-	before, errb, err := r.Run(ctx, "system", "df")
+	found, err := list(ctx, r)
 	if err != nil {
-		return s, fmt.Errorf("docker system df: %w: %s", err, strings.TrimSpace(string(errb)))
-	}
-	s.BeforeText = string(before)
-
-	if err := runJSON(ctx, r, &s.DiskUsage, "system", "df", "-v", "--format", "json"); err != nil {
 		return s, err
 	}
 
-	if s.Containers, err = readContainers(ctx, r, p); err != nil {
-		return s, err
+	// In parallel the read costs the slowest call, never the sum.
+	p.Steps(found.steps())
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	var wg sync.WaitGroup
+	var failed error
+	var mu sync.Mutex
+	go2 := func(f func() error) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := f(); err != nil {
+				mu.Lock()
+				if failed == nil {
+					// The read is fatal, so the rest answers nothing.
+					failed = err
+					cancel()
+				}
+				mu.Unlock()
+			}
+		}()
 	}
-	if s.Images, err = readImages(ctx, r, p); err != nil {
-		return s, err
+
+	go2(func() (err error) {
+		s.Containers, err = inspect[Container](ctx, r, "container", found.containers, p)
+		return err
+	})
+	go2(func() (err error) {
+		s.Images, err = inspect[Image](ctx, r, "image", found.images, p)
+		return err
+	})
+	go2(func() (err error) {
+		s.Volumes, err = inspect[Volume](ctx, r, "volume", found.volumes, p)
+		return err
+	})
+	go2(func() (err error) {
+		s.Networks, err = inspect[Network](ctx, r, "network", found.networks, p)
+		return err
+	})
+	go2(func() error {
+		// The daemon measures every volume in a single pass, so this step
+		// cannot be split. Naming the count says how big the job is.
+		did := p.Step("measuring disk usage: %s, in a single docker pass",
+			progress.Count("volume", "volumes", len(found.volumes)))
+		defer did()
+		return runJSON(ctx, r, &s.DiskUsage, "system", "df", "-v", "--format", "json")
+	})
+	wg.Wait()
+	if failed != nil {
+		return s, failed
 	}
-	if s.Volumes, err = readVolumes(ctx, r, p); err != nil {
-		return s, err
-	}
-	if s.Networks, err = readNetworks(ctx, r, p); err != nil {
-		return s, err
-	}
-	p.Stage("reading the build cache")
-	s.Caches, s.CacheUnavailable = readCaches(ctx, r, s.DiskUsage)
+	s.BeforeText = Summary(s.DiskUsage)
+
+	s.Caches, s.CacheUnavailable = readCaches(ctx, r, p, found.builders, s.DiskUsage)
 	return s, nil
 }
 
-func readContainers(ctx context.Context, r Runner, p *progress.Reporter) ([]Container, error) {
-	p.Stage("reading containers")
+// list enumerates what the machine holds. Every call here returns names only,
+// so the daemon measures nothing and answers straight away.
+func list(ctx context.Context, r Runner) (listing, error) {
+	var l listing
+
 	out, errb, err := r.Run(ctx, "ps", "-aq", "--no-trunc")
 	if err != nil {
-		return nil, fmt.Errorf("docker ps: %w: %s", err, strings.TrimSpace(string(errb)))
+		return l, fmt.Errorf("docker ps: %w: %s", err, strings.TrimSpace(string(errb)))
 	}
-	return inspect[Container](ctx, r, "container", lines(out), p)
+	l.containers = lines(out)
+
+	// `image ls` runs without -a on purpose: -a surfaces intermediate images,
+	// whose removal docker refuses and which no user asked to reclaim.
+	if l.images, err = listField(ctx, r, "ID", "image", "ls", "--no-trunc", "--format", "json"); err != nil {
+		return l, err
+	}
+	if l.volumes, err = listField(ctx, r, "Name", "volume", "ls", "--format", "json"); err != nil {
+		return l, err
+	}
+	if l.networks, err = listField(ctx, r, "ID", "network", "ls", "--no-trunc", "--format", "json"); err != nil {
+		return l, err
+	}
+
+	// No buildx is not a failure: the disk-usage pass still reports the cache.
+	l.builders, _ = runNDJSON[Builder](ctx, r, "buildx", "ls", "--format", "json")
+	return l, nil
 }
 
-// readImages lists without -a on purpose: -a surfaces intermediate images,
-// whose removal docker refuses and which no user ever asked to reclaim.
-func readImages(ctx context.Context, r Runner, p *progress.Reporter) ([]Image, error) {
-	p.Stage("reading images")
-	type row struct {
-		ID string `json:"ID"`
-	}
-	rows, err := runNDJSON[row](ctx, r, "image", "ls", "--no-trunc", "--format", "json")
+// listField reads the named column of an `ls` listing, discarding a repeat.
+// Docker lists an image per tag, and a repeat would be inspected again.
+func listField(ctx context.Context, r Runner, field string, args ...string) ([]string, error) {
+	rows, err := runNDJSON[map[string]any](ctx, r, args...)
 	if err != nil {
 		return nil, err
 	}
 	seen := set.New[string]()
-	var ids []string
-	for _, x := range rows {
-		if x.ID != "" && !seen.Contains(x.ID) {
-			seen.Add(x.ID)
-			ids = append(ids, x.ID)
+	var out []string
+	for _, row := range rows {
+		v, _ := row[field].(string)
+		if v == "" || seen.Contains(v) {
+			continue
 		}
+		seen.Add(v)
+		out = append(out, v)
 	}
-	return inspect[Image](ctx, r, "image", ids, p)
+	return out, nil
 }
 
-func readVolumes(ctx context.Context, r Runner, p *progress.Reporter) ([]Volume, error) {
-	p.Stage("reading volumes")
-	type row struct {
-		Name string `json:"Name"`
-	}
-	rows, err := runNDJSON[row](ctx, r, "volume", "ls", "--format", "json")
-	if err != nil {
-		return nil, err
-	}
-	var names []string
-	for _, x := range rows {
-		if x.Name != "" {
-			names = append(names, x.Name)
-		}
-	}
-	return inspect[Volume](ctx, r, "volume", names, p)
-}
-
-func readNetworks(ctx context.Context, r Runner, p *progress.Reporter) ([]Network, error) {
-	p.Stage("reading networks")
-	type row struct {
-		ID string `json:"ID"`
-	}
-	rows, err := runNDJSON[row](ctx, r, "network", "ls", "--no-trunc", "--format", "json")
-	if err != nil {
-		return nil, err
-	}
-	var ids []string
-	for _, x := range rows {
-		if x.ID != "" {
-			ids = append(ids, x.ID)
-		}
-	}
-	return inspect[Network](ctx, r, "network", ids, p)
-}
-
-// readCaches enumerates every builder, because `docker buildx du` and `docker
-// buildx prune` both act on a single builder and a docker-container builder
-// keeps its cache in its own volume. A failure here is reported, not fatal:
-// build cache is a step of the read, and losing it must not block the rest of the run.
-func readCaches(ctx context.Context, r Runner, du DiskUsage) ([]Cache, string) {
-	builders, err := runNDJSON[Builder](ctx, r, "buildx", "ls", "--format", "json")
-	if err != nil || len(builders) == 0 {
+// readCaches reads every builder, because `docker buildx du` and `docker buildx
+// prune` act on a single builder, and a docker-container builder keeps its
+// cache in its own volume. A failure here is reported, not fatal: losing the
+// build cache must not block the rest of the run.
+func readCaches(ctx context.Context, r Runner, p *progress.Reporter, builders []Builder, du DiskUsage) ([]Cache, string) {
+	if len(builders) == 0 {
 		if len(du.BuildCache) > 0 {
 			return []Cache{{Builder: "", Records: du.BuildCache}}, ""
-		}
-		if err != nil {
-			return nil, "cannot enumerate builders: " + err.Error()
 		}
 		return nil, ""
 	}
@@ -144,7 +180,9 @@ func readCaches(ctx context.Context, r Runner, du DiskUsage) ([]Cache, string) {
 		if b.Name == "" {
 			continue
 		}
+		did := p.Step("reading the build cache of %s", b.Name)
 		recs, err := runNDJSON[CacheRecord](ctx, r, "buildx", "du", "--builder", b.Name, "--format", "json")
+		did()
 		if err != nil {
 			failures = append(failures, b.Name+": "+err.Error())
 			continue

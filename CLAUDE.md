@@ -11,7 +11,7 @@ One command that removes docker resources nothing will use again. Read the READM
 ## Layout
 
 - `main.go`, `cmd/` -- cobra surface. `root.go` is the cleanup, `watch.go` the events recorder, `inject.go` the runner seam, `docs.go` the generated help dump.
-- `internal/dockercli/` -- every docker read and write. `read.go` gathers a Snapshot, `apply.go` turns one target into one argv.
+- `internal/dockercli/` -- every docker read and write. `read.go` gathers a Snapshot, `apply.go` turns one target into one argv, `summary.go` renders the usage table.
 - `internal/compose/` -- would a project still on disk attach this? `index.go` remembers paths, `scan.go` searches for them, `project.go` renders a compose file, `discover.go` decides alive, deleted or unknown.
 - `internal/plan/` -- `Compute` is pure: snapshot plus options plus one clock reading gives the plan. Nothing else decides what goes.
 - `internal/report/` -- the terminal report (`text.go`) and the JSON document (`json.go`).
@@ -30,5 +30,8 @@ One command that removes docker resources nothing will use again. Read the READM
 - `buildx prune` acts on one builder, so every builder from `buildx ls` gets its own command. Its `until=` takes a Go duration: `168h`, never `7d`.
 - Protection is per image ID, not per tag: if one tag of an id is kept, no `rmi` is emitted for its other tags.
 - Progress goes to stderr, never stdout. A `--json` document stays parseable while the run narrates itself.
+- The read lists before it inspects, so the step count is real. The fraction is docker calls finished over docker calls to make. The line names the step that has waited longest, because that step holds the run up.
+- The inspects and the disk-usage pass run at the same time. `docker system df -v` walks every volume and outlasts the rest, so the read costs the slowest call rather than the sum.
+- `docker system df` is never called for a table. The report renders BEFORE and AFTER from the disk-usage pass the run already made. A second call means a second walk of every volume.
 - The compose search is bounded by `--scan-timeout` and by a depth limit, and it skips a directory it has already read, by device and inode. Each of those exits is a `Failure`, which marks the search incomplete and keeps every unresolved project.
 - A file the render never reached is `Unreadable`, never a project that declares nothing. The second reading retires a live project.

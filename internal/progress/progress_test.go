@@ -109,6 +109,114 @@ func TestTheDetailIsPolledAndFollowsTheStage(t *testing.T) {
 		"a new stage drops the previous stage's counter")
 }
 
+// fakeClock lets a test age a stage without waiting for it.
+type fakeClock struct {
+	mu sync.Mutex
+	at time.Time
+}
+
+func (c *fakeClock) now() time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.at
+}
+
+func (c *fakeClock) advance(d time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.at = c.at.Add(d)
+}
+
+// The failure this covers: a stage draws and then holds still while docker
+// works, so the reader cannot tell a slow read from a wedged run. Past the
+// reporter's patience the line has to keep moving by itself.
+func TestASlowStageShowsThatTimeIsPassing(t *testing.T) {
+	t.Parallel()
+
+	var out safeBuffer
+	clk := &fakeClock{at: time.Unix(1700000000, 0)}
+	r := newClocked(&out, true, 80, clk.now)
+	defer r.Stop()
+
+	r.Stage("reading disk usage")
+	assert.NotContains(t, out.String(), "s]", "a stage that has just started carries no clock")
+
+	clk.advance(9 * time.Second)
+	require.Eventually(t, func() bool {
+		return strings.Contains(out.String(), "reading disk usage [9s]")
+	}, 10*time.Second, 20*time.Millisecond)
+
+	clk.advance(2*time.Minute + 4*time.Second)
+	require.Eventually(t, func() bool {
+		return strings.Contains(out.String(), "reading disk usage [2m13s]")
+	}, 10*time.Second, 20*time.Millisecond)
+}
+
+// A stream that scrolls gets the same news at a readable pace, because a line
+// per tick would bury the log the reader is trying to keep.
+func TestOffATerminalASlowStageRepeatsOnAHeartbeat(t *testing.T) {
+	t.Parallel()
+
+	var out safeBuffer
+	clk := &fakeClock{at: time.Unix(1700000000, 0)}
+	r := newClocked(&out, false, 0, clk.now)
+	defer r.Stop()
+
+	r.Stage("reading disk usage")
+
+	clk.advance(3 * time.Second)
+	time.Sleep(200 * time.Millisecond)
+	assert.Equal(t, 1, strings.Count(out.String(), "reading disk usage"),
+		"a stage under the heartbeat is not worth repeating")
+
+	clk.advance(logHeartbeat)
+	require.Eventually(t, func() bool {
+		return strings.Contains(out.String(), "reading disk usage [8s]")
+	}, 10*time.Second, 20*time.Millisecond)
+}
+
+// The fraction counts what came back, never what was announced. A step that
+// overtakes a slower step must not take over the line.
+func TestTheLineNamesTheStepStillRunning(t *testing.T) {
+	t.Parallel()
+
+	var out safeBuffer
+	clk := &fakeClock{at: time.Unix(1700000000, 0)}
+	r := newClocked(&out, true, 80, clk.now)
+	defer r.Stop()
+
+	r.Steps(4)
+	slow := r.Step("measuring disk usage")
+	clk.advance(time.Second)
+	quick := r.Step("reading networks")
+	quick()
+
+	require.Eventually(t, func() bool {
+		return strings.Contains(out.String(), " 25% (1 of 4) measuring disk usage")
+	}, 10*time.Second, 20*time.Millisecond)
+
+	clk.advance(30 * time.Second)
+	require.Eventually(t, func() bool {
+		return strings.Contains(out.String(), "measuring disk usage [31s]")
+	}, 10*time.Second, 20*time.Millisecond)
+
+	// Between steps the line holds rather than falling back to a stale name.
+	slow()
+	before := out.String()
+	clk.advance(20 * time.Second)
+	time.Sleep(200 * time.Millisecond)
+	assert.Equal(t, before, out.String(), "a phase between steps draws nothing")
+}
+
+func TestTheClockReadsAsTime(t *testing.T) {
+	assert.Equal(t, "[0s]", clock(400*time.Millisecond))
+	assert.Equal(t, "[9s]", clock(9*time.Second))
+	assert.Equal(t, "[59s]", clock(59*time.Second))
+	assert.Equal(t, "[1m00s]", clock(time.Minute))
+	assert.Equal(t, "[2m13s]", clock(2*time.Minute+13*time.Second))
+	assert.Equal(t, "[75m00s]", clock(75*time.Minute))
+}
+
 // A nil reporter is what "--progress never" produces, so every method must
 // accept it.
 func TestANilReporterIsSilentAndSafe(t *testing.T) {
