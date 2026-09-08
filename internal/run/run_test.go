@@ -46,12 +46,9 @@ type docker struct {
 func newDocker() *docker {
 	return &docker{fail: map[string]string{}, reads: map[string]string{
 		"version --format json": `{"Client":{"Version":"29.3.1"},"Server":{"Version":"29.3.1"}}`,
-		"system df":             "TYPE     TOTAL  ACTIVE  SIZE   RECLAIMABLE\nImages   2      1       384MB  134MB\n",
-		"system df -v --format json": `{"LayersSize":1,"Images":[{"Id":"sha256:i1","Size":268435456}],` +
-			`"Containers":[{"Id":"c1","SizeRw":4096}],"Volumes":[],"BuildCache":[]}`,
-		"ps -aq --no-trunc": "c1\n",
-		"container inspect c1": inspectDoc(map[string]any{
-			"Id": "c1", "Name": "/web-old", "Image": "sha256:i1",
+		"ps -aq --no-trunc":     "c1\n",
+		"container inspect --size c1": inspectDoc(map[string]any{
+			"Id": "c1", "Name": "/web-old", "Image": "sha256:i1", "SizeRw": 4096,
 			"Created":         ago(300 * 24 * time.Hour),
 			"State":           map[string]any{"Status": "exited", "FinishedAt": ago(47 * 24 * time.Hour)},
 			"Config":          map[string]any{"Image": "myapp:v1", "Labels": map[string]string{}},
@@ -149,7 +146,9 @@ func TestApplyRunsExactlyThePlannedCommands(t *testing.T) {
 	assert.Equal(t, ExitOK, code)
 	assert.Equal(t, []string{"rm c1", "rmi myapp:v1"}, d.mutations())
 	assert.Contains(t, stdout.String(), "ok       docker rm c1")
-	assert.Contains(t, stdout.String(), "AFTER")
+	// Reporting what was freed needs no further walk of every volume.
+	assert.Contains(t, stdout.String(), "FREED  268.4MB")
+	assert.NotContains(t, strings.Join(d.calls, "\n"), "system df")
 }
 
 // The newest image of a repository is never removed, whatever else happens.
@@ -318,7 +317,7 @@ func TestTheRunPersistsWhatItLearned(t *testing.T) {
 	require.NoError(t, os.WriteFile(file, []byte("services: {}\n"), 0o644))
 
 	d := newDocker()
-	d.reads["container inspect c1"] = inspectDoc(map[string]any{
+	d.reads["container inspect --size c1"] = inspectDoc(map[string]any{
 		"Id": "c1", "Name": "/webapp-db-1", "Image": "sha256:i1",
 		"Created": ago(2 * 24 * time.Hour),
 		"State":   map[string]any{"Status": "running", "FinishedAt": "0001-01-01T00:00:00Z"},

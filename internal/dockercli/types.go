@@ -30,6 +30,8 @@ type Container struct {
 		StartedAt  string `json:"StartedAt"`
 		FinishedAt string `json:"FinishedAt"`
 	} `json:"State"`
+	// SizeRw is the writable layer, which `container inspect --size` fills in.
+	SizeRw int64 `json:"SizeRw"`
 	Config struct {
 		Image  string            `json:"Image"`
 		Labels map[string]string `json:"Labels"`
@@ -63,11 +65,13 @@ type Image struct {
 
 // Volume is an element of `docker volume inspect`.
 type Volume struct {
-	Name      string            `json:"Name"`
-	Driver    string            `json:"Driver"`
-	CreatedAt string            `json:"CreatedAt"`
-	Labels    map[string]string `json:"Labels"`
-	Scope     string            `json:"Scope"`
+	Name   string `json:"Name"`
+	Driver string `json:"Driver"`
+	// Mountpoint is where the driver keeps the data, and what gets measured.
+	Mountpoint string            `json:"Mountpoint"`
+	CreatedAt  string            `json:"CreatedAt"`
+	Labels     map[string]string `json:"Labels"`
+	Scope      string            `json:"Scope"`
 }
 
 // Network is an element of `docker network inspect`.
@@ -89,29 +93,34 @@ type Network struct {
 	Labels map[string]string `json:"Labels"`
 }
 
-// DiskUsage is `docker system df -v --format json`. It supplies sizes only:
-// its RefCount is the daemon's live count and knows nothing about the
-// containers this run is about to remove.
+// DiskUsage supplies sizes, and nothing else. See volumesize.go for why
+// `docker system df -v` does not fill it.
 type DiskUsage struct {
-	LayersSize int64 `json:"LayersSize"`
-	Images     []struct {
-		ID         string `json:"Id"`
-		Size       int64  `json:"Size"`
-		SharedSize int64  `json:"SharedSize"`
-		Containers int    `json:"Containers"` // holders, negative when uncounted
-	} `json:"Images"`
-	Containers []struct {
-		ID     string `json:"Id"`
-		SizeRw int64  `json:"SizeRw"`
-	} `json:"Containers"`
-	Volumes []struct {
-		Name      string `json:"Name"`
-		UsageData struct {
-			Size     int64 `json:"Size"`
-			RefCount int   `json:"RefCount"` // containers holding it
-		} `json:"UsageData"`
-	} `json:"Volumes"`
-	BuildCache []CacheRecord `json:"BuildCache"`
+	LayersSize int64
+	Images     []ImageUsage
+	Containers []ContainerUsage
+	Volumes    []VolumeUsage
+	BuildCache []CacheRecord
+}
+
+// ImageUsage is what an image holds, from `docker image inspect`.
+type ImageUsage struct {
+	ID   string
+	Size int64
+}
+
+// ContainerUsage is a container's writable layer, from `container inspect -s`.
+type ContainerUsage struct {
+	ID     string
+	SizeRw int64
+}
+
+// VolumeUsage is what a volume holds. Measured says the walk finished, which
+// separates an empty volume from a volume nothing could read.
+type VolumeUsage struct {
+	Name     string
+	Size     int64
+	Measured bool
 }
 
 // CacheRecord is a build cache entry.
@@ -145,7 +154,6 @@ type Cache struct {
 type Snapshot struct {
 	Version    Version
 	DiskUsage  DiskUsage
-	BeforeText string
 	Containers []Container
 	Images     []Image
 	Volumes    []Volume

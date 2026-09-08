@@ -5,7 +5,6 @@ package run
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -63,7 +62,7 @@ func Do(ctx context.Context, c Config) int {
 		return emitJSON(ctx, c, p)
 	}
 
-	if err := report.Text(c.Stdout, p, snap.BeforeText, c.DryRun, c.ShowKept); err != nil {
+	if err := report.Text(c.Stdout, p, report.Summary(snap.DiskUsage), c.DryRun, c.ShowKept); err != nil {
 		fmt.Fprintln(c.Stderr, "docker-cleaner:", err)
 		return ExitEnvironment
 	}
@@ -81,19 +80,10 @@ func Do(ctx context.Context, c Config) int {
 		}
 	}
 
-	_, failed := apply(ctx, c, p, c.Stdout)
+	_, freed, failed := apply(ctx, c, p, c.Stdout)
 
-	// Measuring again walks every volume, the slowest thing docker does.
-	c.Progress.Stage("measuring disk usage again")
-	out, _, err := c.Runner.Run(ctx, "system", "df", "-v", "--format", "json")
-	// The line goes before the table does, so the report keeps the screen.
-	c.Progress.Stop()
-
-	var after dockercli.DiskUsage
-	if err == nil && json.Unmarshal(out, &after) == nil {
-		fmt.Fprintln(c.Stdout, "\nAFTER")
-		fmt.Fprintln(c.Stdout, strings.TrimRight(dockercli.Summary(after), "\n"))
-	}
+	// Measured before the removals, because measuring again walks every volume.
+	fmt.Fprintf(c.Stdout, "\nFREED  %s\n", report.Bytes(freed))
 	if failed > 0 {
 		return ExitApplyFailed
 	}
@@ -139,14 +129,16 @@ func discover(ctx context.Context, c Config, snap dockercli.Snapshot) *compose.D
 	})
 }
 
-// apply runs the plan. A failure is reported and the run continues, because a
-// world that changed under us is normal, not exceptional.
-func apply(ctx context.Context, c Config, p plan.Plan, log io.Writer) ([]report.Operation, int) {
+// apply runs the plan, and reports the bytes behind everything that went. A
+// failure is reported and the run continues, because a world that changed under
+// us is normal, not exceptional.
+func apply(ctx context.Context, c Config, p plan.Plan, log io.Writer) ([]report.Operation, int64, int) {
 	fmt.Fprintln(log, "APPLY")
 	c.Progress.Steps(commandCount(p))
 	defer c.Progress.Stop()
 	notRemoved := map[string]bool{}
 	var ops []report.Operation
+	var freed int64
 	failures := 0
 
 	for _, t := range p.Containers {
@@ -155,7 +147,9 @@ func apply(ctx context.Context, c Config, p plan.Plan, log io.Writer) ([]report.
 		if !ok {
 			notRemoved[t.Name] = true
 			failures++
+			continue
 		}
+		freed += t.Size
 	}
 
 	// A container that would not go still holds its image, volume and network.
@@ -169,7 +163,9 @@ func apply(ctx context.Context, c Config, p plan.Plan, log io.Writer) ([]report.
 		ops = append(ops, done...)
 		if !ok {
 			failures++
+			continue
 		}
+		freed += t.Size
 	}
 
 	for _, cp := range p.Caches {
@@ -177,9 +173,11 @@ func apply(ctx context.Context, c Config, p plan.Plan, log io.Writer) ([]report.
 		ops = append(ops, op)
 		if !op.OK {
 			failures++
+			continue
 		}
+		freed += cp.Size
 	}
-	return ops, failures
+	return ops, freed, failures
 }
 
 // commandCount is how many docker calls the apply will make.
@@ -242,7 +240,7 @@ func emitJSON(ctx context.Context, c Config, p plan.Plan) int {
 	doc := report.Build(p, c.DryRun)
 	code := ExitOK
 	if !c.DryRun && !p.Empty() {
-		ops, failures := apply(ctx, c, p, c.Stderr)
+		ops, _, failures := apply(ctx, c, p, c.Stderr)
 		doc.Operations = ops
 		if failures > 0 {
 			code = ExitApplyFailed

@@ -7,8 +7,8 @@
 # The caller reads the log rather than stderr, because docker-cleaner captures
 # a child's stderr instead of passing it through. $FAKE_DOCKER_FAIL holds one
 # argv line that fails, standing in for a world that changed mid-run.
-# $FAKE_DOCKER_STALL holds the seconds `system df -v` waits before it answers,
-# standing in for the full machine where that call runs for minutes.
+# $FAKE_DOCKER_STALL holds the seconds `volume inspect` waits before it answers,
+# standing in for a docker call that takes its time on a full machine.
 set -eu
 
 state="${FAKE_DOCKER_STATE:-dats/fixtures/state}"
@@ -34,11 +34,11 @@ mutate() {
 
 case "$*" in
 "version --format json") emit version.json ;;
-"system df -v --format json")
+"volume inspect "*)
 	if [ -n "$stall" ]; then
 		sleep "$stall"
 	fi
-	emit system_df_v.json
+	emit volume_inspect.json
 	;;
 "ps -aq --no-trunc") emit ps.txt ;;
 "image ls --no-trunc --format json") emit image_ls.json ;;
@@ -47,7 +47,6 @@ case "$*" in
 "buildx ls --format json") emit buildx_ls.json ;;
 "container inspect "*) emit container_inspect.json ;;
 "image inspect "*) emit image_inspect.json ;;
-"volume inspect "*) emit volume_inspect.json ;;
 "network inspect "*) emit network_inspect.json ;;
 "buildx du --builder "*) emit "buildx_du_$4.json" ;;
 "compose -f "*)

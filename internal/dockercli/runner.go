@@ -136,7 +136,13 @@ func inspect[T any](ctx context.Context, r Runner, kind string, ids []string, p 
 	for start := 0; start < len(ids); start += inspectChunk {
 		end := min(start+inspectChunk, len(ids))
 		did := p.Step("reading %ss %d to %d of %d", kind, start+1, end, len(ids))
-		args := append([]string{kind, "inspect"}, ids[start:end]...)
+		args := []string{kind, "inspect"}
+		// A container's writable layer comes back only when it is asked for,
+		// and asking here saves another pass over the same containers.
+		if kind == "container" {
+			args = append(args, "--size")
+		}
+		args = append(args, ids[start:end]...)
 		out, errb, err := r.Run(ctx, args...)
 		did()
 		if err != nil && !missingObject(errb) {

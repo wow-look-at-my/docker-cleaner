@@ -1,8 +1,15 @@
 [
-  {"Name": "pgdata-live", "Driver": "local", "Scope": "local", "CreatedAt": "2021-06-01T10:00:00Z", "Labels": null},
+  {
+    "Name": "pgdata-live", "Driver": "local", "Scope": "local", "CreatedAt": "2021-06-01T10:00:00Z",
+    "Mountpoint": "/var/lib/docker/volumes/pgdata-live/_data", "Labels": null
+  },
   {
     "Name": "orphan_data", "Driver": "local", "Scope": "local", "CreatedAt": "2020-06-01T10:00:00Z",
+    "Mountpoint": "/var/lib/docker/volumes/orphan_data/_data",
     "Labels": {"com.docker.compose.project": "webapp", "com.docker.compose.volume": "data"}
   },
-  {"Name": "scratch", "Driver": "local", "Scope": "local", "CreatedAt": "2020-06-01T10:00:00Z", "Labels": null}
+  {
+    "Name": "scratch", "Driver": "local", "Scope": "local", "CreatedAt": "2020-06-01T10:00:00Z",
+    "Mountpoint": "/var/lib/docker/volumes/scratch/_data", "Labels": null
+  }
 ]
