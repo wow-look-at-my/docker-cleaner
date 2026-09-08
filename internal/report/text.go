@@ -196,6 +196,14 @@ func targetSize(t plan.Target) string {
 	return Bytes(t.Size)
 }
 
+// targetSize keeps a size nobody measured from reading as an empty resource.
+func targetSize(t plan.Target) string {
+	if t.Unmeasured {
+		return "?"
+	}
+	return Bytes(t.Size)
+}
+
 func builderName(name string) string {
 	if name == "" {
 		return "default"

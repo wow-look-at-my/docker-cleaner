@@ -32,6 +32,7 @@ func TestVolumesNoneOfWhichWereMeasuredHaveNoSize(t *testing.T) {
 	assert.Contains(t, out, "Local Volumes          2            ?  +2 unmeasured")
 }
 
+
 // `buildx du` failing leaves no records. Rendering that as 0B reports an empty
 // cache, which is a measurement nobody made.
 func TestAnUnreadableBuildCacheReadsAsUnknownNotEmpty(t *testing.T) {
