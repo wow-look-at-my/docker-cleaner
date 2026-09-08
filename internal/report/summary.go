@@ -12,13 +12,15 @@ import (
 // volume, which is the slowest thing it does and the reason it is not used.
 //
 // A volume nothing could read is counted in the total and left out of the size,
-// and the row says how many those are.
-func Summary(du dockercli.DiskUsage) string {
+// and the row says how many those are. A build cache nothing could read has no
+// size at all, and the row says so rather than printing a size nobody measured.
+func Summary(du dockercli.DiskUsage, cacheUnavailable string) string {
 	rows := []struct {
-		label string
-		total int
-		size  int64
-		note  string
+		label   string
+		total   int
+		size    int64
+		note    string
+		unknown bool
 	}{
 		{label: "Images", total: len(du.Images)},
 		{label: "Containers", total: len(du.Containers)},
@@ -45,11 +47,19 @@ func Summary(du dockercli.DiskUsage) string {
 	for _, b := range du.BuildCache {
 		rows[3].size += b.Size
 	}
+	if cacheUnavailable != "" {
+		rows[3].unknown = true
+		rows[3].note = "not readable"
+	}
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "%-15s %8s %12s  %s\n", "TYPE", "TOTAL", "SIZE", "")
 	for _, r := range rows {
-		fmt.Fprintf(&b, "%-15s %8d %12s  %s\n", r.label, r.total, Bytes(r.size), r.note)
+		total, size := fmt.Sprintf("%d", r.total), Bytes(r.size)
+		if r.unknown {
+			total, size = "?", "?"
+		}
+		fmt.Fprintf(&b, "%-15s %8s %12s  %s\n", r.label, total, size, r.note)
 	}
 	return b.String()
 }

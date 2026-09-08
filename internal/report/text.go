@@ -13,6 +13,7 @@ import (
 // stays short.
 var doc = template.Must(template.New("report").Funcs(template.FuncMap{
 	"bytes":       Bytes,
+	"size":        targetSize,
 	"age":         plan.HumanAge,
 	"join":        strings.Join,
 	"total":       totalSize,
@@ -34,7 +35,7 @@ BEFORE
 
 {{.Title}}  ({{len .Targets}}, {{bytes (total .Targets)}})
 {{- range .Targets}}
-  {{printf "%-40s" .Name}} {{printf "%10s" (bytes .Size)}}  {{.Detail}}
+  {{printf "%-40s" .Name}} {{printf "%10s" (size .)}}  {{.Detail}}
   {{- if .FreedBy}}
       freed by removing {{join .FreedBy ", "}}
   {{- end}}
@@ -162,6 +163,14 @@ func totalSize(targets []plan.Target) int64 {
 		n += t.Size
 	}
 	return n
+}
+
+// targetSize keeps a size nobody measured from reading as an empty resource.
+func targetSize(t plan.Target) string {
+	if t.Unmeasured {
+		return "?"
+	}
+	return Bytes(t.Size)
 }
 
 func builderName(name string) string {

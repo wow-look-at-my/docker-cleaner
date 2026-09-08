@@ -72,6 +72,52 @@ func TestRecordKeepsComposesFileOrder(t *testing.T) {
 	assert.Equal(t, files, idx.Projects["webapp"].Files)
 }
 
+// Separate stacks in separate directories can carry the same project name.
+// Their files render apart, because compose builds no project out of both.
+func TestFilesFromSeparateStacksStayInSeparateSets(t *testing.T) {
+	dir := t.TempDir()
+	first := filepath.Join(dir, "repo", "compose.yaml")
+	second := filepath.Join(dir, "manager", "docker-compose.yml")
+	over := filepath.Join(dir, "manager", "docker-compose.override.yml")
+	for _, f := range []string{first, second, over} {
+		write(t, f)
+	}
+	idx := LoadIndex(filepath.Join(dir, "projects.json"))
+
+	idx.Record("monitoring", []string{first}, seen)
+	idx.Record("monitoring", []string{second, over}, seen)
+
+	assert.ElementsMatch(t, [][]string{{first}, {second, over}}, idx.Sets("monitoring"))
+	assert.Equal(t, []string{second, over, first}, idx.Files("monitoring"),
+		"the union is what retirement stats")
+}
+
+// A set is rendered only where every file in it survives, and a set whose files
+// all vanished is gone rather than rendered short.
+func TestASetKeepsOnlyThePathsThatStillExist(t *testing.T) {
+	dir := t.TempDir()
+	live := filepath.Join(dir, "here", "compose.yaml")
+	write(t, live)
+	idx := LoadIndex(filepath.Join(dir, "projects.json"))
+
+	idx.Record("app", []string{live, filepath.Join(dir, "gone", "compose.yaml")}, seen)
+	idx.Record("app", []string{filepath.Join(dir, "also-gone", "compose.yaml")}, seen)
+
+	assert.Equal(t, [][]string{{live}}, idx.Sets("app"))
+}
+
+// An index written before sets existed carries the union alone, and that union
+// is the only set it can offer.
+func TestAnIndexWithoutSetsFallsBackToItsUnion(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "app", "compose.yaml")
+	write(t, file)
+	idx := LoadIndex(filepath.Join(dir, "projects.json"))
+	idx.Projects["app"] = Entry{Files: []string{file}, Seen: seen}
+
+	assert.Equal(t, [][]string{{file}}, idx.Sets("app"))
+}
+
 // An index written by a version that sorted the paths holds an override ahead
 // of its base. The next run says what compose says, so the record is repaired
 // rather than carried forward.

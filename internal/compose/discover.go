@@ -62,11 +62,12 @@ func Discover(ctx context.Context, r dockercli.Runner, containers []dockercli.Co
 	var sets [][]string
 	seen := set.New[string]()
 	for _, project := range sortedProjects(wanted) {
-		found := idx.Files(project)
-		if len(found) > 0 && !seen.Contains(project) {
-			seen.Add(project)
-			sets = append(sets, found)
+		if seen.Contains(project) {
+			continue
 		}
+		seen.Add(project)
+		found := idx.Sets(project)
+		sets = append(sets, found...)
 		// Nothing has ever named a file for a project the index never
 		// recorded, so a missing file says nothing about it.
 		if len(found) == 0 && !idx.Recorded(project) {
