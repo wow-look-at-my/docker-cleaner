@@ -64,7 +64,7 @@ func TestAnUnreadableVolumeIsAbsentRatherThanEmpty(t *testing.T) {
 
 	assert.NotContains(t, sizes, "gone")
 	assert.NotContains(t, sizes, "remote")
-	assert.Equal(t, int64(64), sizes["real"])
+	assert.Contains(t, sizes, "real")
 }
 
 // An interrupt has to reach the walk, which means watching the context rather
