@@ -124,6 +124,7 @@ func (r *Reporter) Steps(total int) {
 	}
 	r.mu.Lock()
 	r.total, r.finished = total, 0
+	r.restart()
 	r.mu.Unlock()
 }
 
@@ -183,6 +184,23 @@ func (r *Reporter) Stop() {
 	r.stage, r.drawn = "", ""
 	r.running = map[int]step{}
 	r.total, r.finished = 0, 0
+}
+
+// Log writes a line that shares the screen with the reporter. A drawn line
+// carries no newline, so a write straight to the log lands on the end of it.
+// This clears the drawn line, and the next tick draws it below the new text.
+func (r *Reporter) Log(w io.Writer, format string, args ...any) {
+	if r == nil {
+		fmt.Fprintf(w, format, args...)
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.dirty {
+		fmt.Fprint(r.w, "\r\033[K")
+		r.dirty, r.drawn = false, ""
+	}
+	fmt.Fprintf(w, format, args...)
 }
 
 // restart brings the draw loop back after a Stop. The caller holds the lock.
